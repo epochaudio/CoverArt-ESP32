@@ -1,0 +1,2 @@
+# Espressif ESP32-S3-BOX-Lite: ESP32-S3, 16 MB flash, 8 MB PSRAM, ST7789 320x240.
+set(COVERART_TARGET esp32s3)

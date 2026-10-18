@@ -1,0 +1,6 @@
+# Shared by every board; boards/<name>/sdkconfig.defaults is applied on top.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_FREERTOS_HZ=1000
+# Setup mode runs its loop (QR code, joining attempts) on the main task.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144

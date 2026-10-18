@@ -1,0 +1,6 @@
+{
+  "title": "ESP32-S3-BOX-Lite",
+  "chip_family": "ESP32-S3",
+  "description": "2.4\" 320x240 display",
+  "url": "https://github.com/espressif/esp-box"
+}

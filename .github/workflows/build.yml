@@ -1,0 +1,71 @@
+# Builds every board on each push and pull request. A version tag (v*) also
+# publishes a GitHub Release with the images and deploys the web installer to
+# GitHub Pages. The tag must match version.txt.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - board: c3-lcdkit
+            target: esp32c3
+          - board: box-lite
+            target: esp32s3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.board }}
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0.1
+          target: ${{ matrix.target }}
+          command: tools/build.sh ${{ matrix.board }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.board }}
+          path: dist/${{ matrix.board }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: firmware
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches version.txt
+        run: test "v$(head -n1 version.txt)" = "${GITHUB_REF_NAME}"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+      - name: Arrange downloaded artifacts as dist/<board>/
+        run: for d in dist/dist-*; do mv "$d" "dist/${d#dist/dist-}"; done
+      - name: Assemble web installer
+        run: python3 tools/make_site.py
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*/coverart-*.bin
+          generate_release_notes: true
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoverArt ESP32 安装 · Installer</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1c1c1c; --muted: #666; --card: #fff; --line: #ddd; --accent: #2f7d5b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141414; --fg: #eee; --muted: #9a9a9a; --card: #1e1e1e; --line: #333; --accent: #4fae84; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; }
+  p, li { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 24px; }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  select { width: 100%; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--bg); color: var(--fg); }
+  .board-note { font-size: 14px; margin: 8px 0 16px; }
+  esp-web-install-button { display: block; margin-top: 8px; }
+  esp-web-install-button button[slot="activate"] { width: 100%; padding: 14px; font-size: 17px; border: 0;
+           border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
+  .unsupported { color: #c0392b; }
+  footer { margin-top: 40px; font-size: 14px; color: var(--muted); }
+  a { color: var(--accent); }
+</style>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+</head>
+<body>
+<main>
+  <h1>CoverArt ESP32</h1>
+  <p>把 ESP32 小屏变成 Roon 专辑封面显示器。<br>Turn an ESP32 display into a Roon album-art screen.</p>
+
+  <div class="card">
+    <label for="board">1. 选择开发板 Choose your board</label>
+    <select id="board"></select>
+    <p class="board-note" id="board-note"></p>
+
+    <label>2. 用 USB 线连接电脑，点击安装 Connect via USB and install</label>
+    <esp-web-install-button id="install">
+      <button slot="activate">安装 Install</button>
+      <span slot="unsupported" class="unsupported">
+        此浏览器不支持网页刷写，请使用电脑版 Chrome 或 Edge。<br>
+        This browser cannot flash devices. Use desktop Chrome or Edge.
+      </span>
+      <span slot="not-allowed" class="unsupported">
+        需要通过 HTTPS 打开此页面。<br>This page must be opened over HTTPS.
+      </span>
+    </esp-web-install-button>
+    <p class="board-note" id="version"></p>
+  </div>
+
+  <h2>安装之后 After installing</h2>
+  <ol>
+    <li>屏幕显示二维码：用手机扫码加入 <b>CoverArt-XXXXXX</b> 网络，在弹出的页面选择家里的 2.4 GHz Wi-Fi 并输入密码。<br>
+        Scan the QR code on the screen to join <b>CoverArt-XXXXXX</b>, then pick your 2.4 GHz Wi-Fi on the page that opens.</li>
+    <li>在 Roon 中打开 设置 → 扩展，启用 <b>CoverArt_ESP32</b>。<br>
+        In Roon, open Settings → Extensions and enable <b>CoverArt_ESP32</b>.</li>
+    <li>点该扩展的“设置”，选择要显示封面的 Zone。<br>
+        Open the extension's Settings and choose the zone to follow.</li>
+  </ol>
+
+  <h2>恢复出厂 Factory reset</h2>
+  <p>插电后 5 秒内拔掉，重复两次；第三次插电时清除 Wi-Fi、Roon 配对和 Zone 设置，重新进入配网。<br>
+     Plug the device in and unplug it within 5 seconds, twice. On the third plug-in it erases Wi-Fi, Roon pairing and zone, and starts setup again.</p>
+
+  <footer>
+    开源项目 Open source (MIT) · <a href="https://github.com/epochaudio/CoverArt-ESP32">GitHub</a> ·
+    与 Roon Labs 无关 Not affiliated with Roon Labs.
+  </footer>
+</main>
+<script>
+  const select = document.getElementById("board");
+  const note = document.getElementById("board-note");
+  const install = document.getElementById("install");
+  let boards = [];
+
+  function choose(id) {
+    const board = boards.find((b) => b.id === id);
+    if (!board) return;
+    install.manifest = board.manifest;
+    note.innerHTML = `${board.description} · <a href="${board.url}" target="_blank" rel="noopener">${board.title}</a>`;
+  }
+
+  fetch("boards.json")
+    .then((r) => r.json())
+    .then((data) => {
+      boards = data.boards;
+      document.getElementById("version").textContent = `固件版本 Firmware ${data.version}`;
+      for (const b of boards) select.add(new Option(b.title, b.id));
+      select.addEventListener("change", () => choose(select.value));
+      choose(boards[0].id);
+    });
+</script>
+</body>
+</html>
