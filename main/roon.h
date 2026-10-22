@@ -1,4 +1,5 @@
 #pragma once
+#include <stdbool.h>
 
 // Runs the Roon extension forever: discover Core, pair, follow the zone chosen
 // in the extension settings and show its cover. Call once from app_main.
@@ -6,7 +7,26 @@ void roon_start(void);
 
 // Playback controls for the selected zone. Safe to call from any task: they
 // only queue a request for the Roon task, and are dropped while unpaired.
-typedef enum { ROON_CONTROL_PLAYPAUSE, ROON_CONTROL_NEXT } roon_control_t;
+// PLAY and PAUSE are idempotent; use them when the intent is a state, not a toggle.
+typedef enum {
+    ROON_CONTROL_PLAYPAUSE,
+    ROON_CONTROL_PLAY,
+    ROON_CONTROL_PAUSE,
+    ROON_CONTROL_NEXT,
+    ROON_CONTROL_PREVIOUS,
+} roon_control_t;
 void roon_control(roon_control_t control);
 // Positive steps raise the volume, in the output's own step size.
 void roon_change_volume(int steps);
+
+// Volume of the selected output as last reported by Core.
+typedef struct {
+    bool adjustable;  // false for fixed-volume outputs or before the first report
+    float value, min, max;
+    bool is_db;       // value in dB, else on a 0..max number scale
+} roon_volume_t;
+roon_volume_t roon_volume(void);
+
+// Redraws the current cover, or the current status screen if no cover is up.
+// For overlays (volume, confirmations) that need to give the screen back.
+void roon_redraw(void);

@@ -94,6 +94,7 @@ static session_t s;
 static char s_output_id[96], s_output_name[96];
 static bool s_cover_shown;
 static char s_extension_id[64], s_display_name[64];
+static roon_volume_t s_volume;  // written by the Roon task, read by input tasks (a torn read only mis-shows one value)
 // Address of the current session and whether it came from the NVS cache
 // rather than a fresh SOOD answer.
 static char s_core_host[16];
@@ -101,6 +102,9 @@ static uint16_t s_core_port;
 static bool s_core_from_cache;
 
 // ---------------------------------------------------------------- helpers
+
+static int s_status = -1;  // last status shown, redrawn after overlays
+static void draw_status(ui_status_t st);
 
 static void show_status(ui_status_t st)
 {
@@ -111,11 +115,14 @@ static void show_status(ui_status_t st)
         [UI_SELECT_ZONE] = "select a zone in Roon",
         [UI_NOTHING_PLAYING] = "nothing playing",
     };
-    static int shown = -1;
-    if ((int)st == shown) return;
-    shown = st;
+    if ((int)st == s_status) return;
+    s_status = st;
     ESP_LOGI(TAG, "status: %s", names[st]);
-    if (s_cover_shown) return;
+    if (!s_cover_shown) draw_status(st);
+}
+
+static void draw_status(ui_status_t st)
+{
     switch (st) {
     case UI_FINDING_CORE: {
         const char *l[] = {"FINDING", "ROON CORE"};
@@ -221,6 +228,16 @@ static void update_volume_support(const cJSON *zone)
         if (!id || strcmp(id, s_output_id) != 0) continue;
         const cJSON *volume = cJSON_GetObjectItemCaseSensitive(output, "volume");
         bool supported = cJSON_IsObject(volume);
+        roon_volume_t v = {.adjustable = supported};
+        if (supported) {
+            const cJSON *f;
+            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "value"))) v.value = f->valuedouble;
+            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "min"))) v.min = f->valuedouble;
+            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "max"))) v.max = f->valuedouble;
+            const char *type = str_of(volume, "type");
+            v.is_db = type && strcmp(type, "db") == 0;
+        }
+        s_volume = v;
         if (supported != s.volume_supported) {
             s.volume_supported = supported;
             if (supported) {
@@ -407,7 +424,10 @@ static bool controls_ready(void)
 
 static void send_control(roon_control_t control)
 {
-    static const char *names[] = {[ROON_CONTROL_PLAYPAUSE] = "playpause", [ROON_CONTROL_NEXT] = "next"};
+    static const char *names[] = {
+        [ROON_CONTROL_PLAYPAUSE] = "playpause", [ROON_CONTROL_PLAY] = "play", [ROON_CONTROL_PAUSE] = "pause",
+        [ROON_CONTROL_NEXT] = "next", [ROON_CONTROL_PREVIOUS] = "previous",
+    };
     cJSON *b = cJSON_CreateObject();
     cJSON_AddStringToObject(b, "zone_or_output_id", s_output_id);
     cJSON_AddStringToObject(b, "control", names[control]);
@@ -799,6 +819,16 @@ void roon_control(roon_control_t control)
 void roon_change_volume(int steps)
 {
     post_input(EV_VOLUME, steps);
+}
+
+roon_volume_t roon_volume(void)
+{
+    return s_volume;
+}
+
+void roon_redraw(void)
+{
+    if (!cover_redraw() && s_status >= 0) draw_status((ui_status_t)s_status);
 }
 
 // Per-device identity: Roon keys pairing and settings by extension id, so

@@ -11,6 +11,7 @@
 #include "roon.h"
 #include "screen_guard.h"
 #include "store.h"
+#include "touch.h"
 #include "ui.h"
 #include "wifi.h"
 
@@ -46,6 +47,7 @@ void app_main(void)
     screen_guard_start();
     roon_start();
     knob_start();
+    touch_start();
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(WIFI_WATCH_PERIOD_MS));
         if (wifi_offline_ms() > WIFI_LOST_RESTART_MS) {

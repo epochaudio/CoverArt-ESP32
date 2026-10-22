@@ -19,6 +19,16 @@ static void window_passed(void *arg)
     store_clear_power_cycles();
 }
 
+void factory_reset_now(void)
+{
+    ESP_LOGW(TAG, "factory reset");
+    const char *lines[] = {"FACTORY RESET", "", "Settings", "erased"};
+    ui_message(lines, 4);
+    store_erase_all();
+    vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_NOTICE_MS));
+    esp_restart();
+}
+
 void factory_reset_check(void)
 {
     if (esp_reset_reason() != ESP_RST_POWERON) {
@@ -27,12 +37,8 @@ void factory_reset_check(void)
     }
     int cycles = store_bump_power_cycles();
     if (cycles >= FACTORY_RESET_POWER_CYCLES) {
-        ESP_LOGW(TAG, "%d quick power-ons: factory reset", cycles);
-        const char *lines[] = {"FACTORY RESET", "", "Settings", "erased"};
-        ui_message(lines, 4);
-        store_erase_all();
-        vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_NOTICE_MS));
-        esp_restart();
+        ESP_LOGW(TAG, "%d quick power-ons", cycles);
+        factory_reset_now();
     }
     ESP_LOGI(TAG, "quick power-on %d of %d", cycles, FACTORY_RESET_POWER_CYCLES);
     const esp_timer_create_args_t args = {.callback = window_passed, .name = "reset_window"};

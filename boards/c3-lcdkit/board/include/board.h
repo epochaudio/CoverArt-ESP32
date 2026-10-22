@@ -17,6 +17,7 @@
 #define MOO_MAX_MESSAGE_BYTES  (96 * 1024)
 
 // Rotary encoder with push switch (active low, internal pull-ups).
+#define BOARD_HAS_TOUCH  0
 #define BOARD_HAS_KNOB   1
 #define KNOB_PIN_A       10
 #define KNOB_PIN_B       6

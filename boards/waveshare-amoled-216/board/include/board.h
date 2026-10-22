@@ -16,6 +16,8 @@
 // PSRAM: room for a full zone snapshot with many zones.
 #define MOO_MAX_MESSAGE_BYTES  (512 * 1024)
 
+// CST9217 capacitive touch, single finger, panel coordinates.
+#define BOARD_HAS_TOUCH  1
 #define BOARD_HAS_KNOB   0
 
 // Screen guard (main/screen_guard.h): AMOLED burn-in and battery.

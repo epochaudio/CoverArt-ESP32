@@ -4,6 +4,7 @@
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
 #include "esp_lcd_co5300.h"
+#include "esp_lcd_touch_cst9217.h"
 #include "esp_log.h"
 
 static const char *TAG = "board";
@@ -17,6 +18,8 @@ static const char *TAG = "board";
 #define PIN_LCD_D2      6
 #define PIN_LCD_D3      7
 #define PIN_LCD_RST     39
+#define PIN_TP_RST      40
+#define PIN_TP_INT      11
 #define PIN_I2C_SCL     14
 #define PIN_I2C_SDA     15
 #define I2C_HZ          400000
@@ -42,6 +45,7 @@ static const co5300_lcd_init_cmd_t kPanelInit[] = {
 
 static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_handle_t s_panel;
+static esp_lcd_touch_handle_t s_touch;
 
 // Devices expected on the shared I2C bus, logged at boot so a board revision
 // with different parts shows up in the first log.
@@ -57,6 +61,38 @@ static void probe_i2c(void)
     }
 }
 
+static void touch_init(void)
+{
+    esp_lcd_panel_io_handle_t io;
+    esp_lcd_panel_io_i2c_config_t io_cfg = ESP_LCD_TOUCH_IO_I2C_CST9217_CONFIG();
+    io_cfg.scl_speed_hz = I2C_HZ;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(s_i2c, &io_cfg, &io));
+    const esp_lcd_touch_config_t cfg = {
+        .x_max = LCD_WIDTH,
+        .y_max = LCD_HEIGHT,
+        .rst_gpio_num = PIN_TP_RST,
+        .int_gpio_num = PIN_TP_INT,
+        .levels = {.reset = 0, .interrupt = 0},
+        // Matches the panel orientation set by MADCTL 0xA0 (as in the BSP).
+        .flags = {.swap_xy = 1, .mirror_x = 0, .mirror_y = 1},
+    };
+    if (esp_lcd_touch_new_i2c_cst9217(io, &cfg, &s_touch) != ESP_OK) {
+        ESP_LOGE(TAG, "touch controller not responding; touch disabled");
+        s_touch = NULL;
+    }
+}
+
+bool board_touch_read(uint16_t *x, uint16_t *y)
+{
+    if (!s_touch || esp_lcd_touch_read_data(s_touch) != ESP_OK) return false;
+    esp_lcd_touch_point_data_t point;
+    uint8_t count = 0;
+    if (esp_lcd_touch_get_data(s_touch, &point, &count, 1) != ESP_OK || count == 0) return false;
+    *x = point.x;
+    *y = point.y;
+    return true;
+}
+
 void board_init(void)
 {
     i2c_master_bus_config_t bus = {
@@ -69,6 +105,7 @@ void board_init(void)
     };
     ESP_ERROR_CHECK(i2c_new_master_bus(&bus, &s_i2c));
     probe_i2c();
+    touch_init();
 }
 
 esp_lcd_panel_handle_t board_display_init(esp_lcd_panel_io_color_trans_done_cb_t on_flushed, void *ctx)

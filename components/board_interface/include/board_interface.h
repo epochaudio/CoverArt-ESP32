@@ -15,10 +15,12 @@
 //   COVER_SIZE                   square cover size requested from Roon
 //   MOO_MAX_MESSAGE_BYTES        largest Roon message accepted
 //   BOARD_HAS_KNOB               1 with KNOB_PIN_A, KNOB_PIN_B, KNOB_PIN_PRESS
+//   BOARD_HAS_TOUCH              1 if board_touch_read() is implemented
 //   SCREEN_DIM_AFTER_MS, SCREEN_OFF_AFTER_MS, SCREEN_DIM_PERCENT,
 //   SCREEN_PIXEL_SHIFT           idle dimming and burn-in protection, see
 //                                main/screen_guard.h (0 = off)
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -34,3 +36,7 @@ esp_lcd_panel_handle_t board_display_init(esp_lcd_panel_io_color_trans_done_cb_t
 
 // 0 = dark. Boards with an on/off backlight treat any other value as full on.
 void board_display_set_brightness(uint8_t percent);
+
+// BOARD_HAS_TOUCH boards: true while a finger is down, with its position in
+// panel pixels (origin top left, same orientation as the image).
+bool board_touch_read(uint16_t *x, uint16_t *y);

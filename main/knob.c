@@ -9,7 +9,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "roon.h"
+#include "input.h"
 
 static const char *TAG = "knob";
 
@@ -32,10 +32,11 @@ static int read_ab(void)
 
 static void on_clicks(int count)
 {
+    if (!input_begin(INPUT_SOURCE_KNOB)) return;
     if (count == 1) {
-        roon_control(ROON_CONTROL_PLAYPAUSE);
+        input_control(INPUT_SOURCE_KNOB, ROON_CONTROL_PLAYPAUSE);
     } else if (count == 2) {
-        roon_control(ROON_CONTROL_NEXT);
+        input_control(INPUT_SOURCE_KNOB, ROON_CONTROL_NEXT);
     } else {
         ESP_LOGI(TAG, "%d clicks ignored", count);
     }
@@ -63,7 +64,7 @@ static void knob_task(void *arg)
                            : quarter_steps <= -KNOB_DETENT_TRANSITIONS ? -1 : 0;
                 quarter_steps = 0;
                 if (detent) {
-                    roon_change_volume(detent);
+                    if (input_begin(INPUT_SOURCE_KNOB)) input_volume(INPUT_SOURCE_KNOB, detent);
                     clicks = 0;  // turning cancels a pending click sequence
                     if (pressed) turned_while_pressed = true;
                 }

@@ -50,7 +50,9 @@ static UINT write_block(JDEC *jd, void *bitmap, JRECT *r)
     return 1;
 }
 
-// Last cover, kept on boards that redraw it in place (pixel shift).
+// Last cover, kept on boards that redraw it in place: pixel shift, or
+// overlays drawn over it (touch boards).
+#define COVER_KEEP_LAST (SCREEN_PIXEL_SHIFT || BOARD_HAS_TOUCH)
 static uint8_t *s_last_jpeg;
 static size_t s_last_len;
 static bool s_on_screen;
@@ -121,7 +123,7 @@ bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
     display_lock();
     bool ok = draw(jpeg, len);
     s_on_screen = ok;
-#if SCREEN_PIXEL_SHIFT
+#if COVER_KEEP_LAST
     if (ok) {
         uint8_t *copy = malloc(len);
         if (copy) {
@@ -134,6 +136,14 @@ bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
 #endif
     display_unlock();
     return ok;
+}
+
+bool cover_redraw(void)
+{
+    display_lock();
+    const bool redrawn = s_on_screen && s_last_jpeg && draw(s_last_jpeg, s_last_len);
+    display_unlock();
+    return redrawn;
 }
 
 void cover_set_offset(int dx, int dy)

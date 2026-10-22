@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "font5x7.h"
 #include "qrcode.h"
+#include "roon.h"
 
 static const char *TAG = "ui";
 
@@ -98,4 +99,67 @@ void ui_setup(const char *ap_ssid)
     if (esp_qrcode_generate(&cfg, payload) != ESP_OK) ESP_LOGE(TAG, "QR code not generated");
     draw_text(SETUP_HINT_Y, "Scan or join");
     draw_text(SETUP_NAME_Y, ap_ssid);
+}
+
+// ---------------------------------------------------------------- overlays
+
+// Volume box in the middle of the screen: value text above a level bar.
+#define VOLUME_BOX_W      (LCD_WIDTH * 3 / 5)
+#define VOLUME_BOX_H      (TEXT_LINE_PITCH * 3)
+#define VOLUME_BAR_H      (TEXT_HEIGHT / 2)
+#define VOLUME_BAR_MARGIN (TEXT_LINE_PITCH / 2)
+
+void ui_volume_overlay(void)
+{
+    const roon_volume_t v = roon_volume();
+    const int x0 = (LCD_WIDTH - VOLUME_BOX_W) / 2, y0 = (LCD_HEIGHT - VOLUME_BOX_H) / 2;
+    char text[24];
+    if (!v.adjustable) snprintf(text, sizeof(text), "FIXED VOLUME");
+    else if (v.is_db) snprintf(text, sizeof(text), "%.1f dB", v.value);
+    else snprintf(text, sizeof(text), "%d", (int)v.value);
+
+    display_lock();
+    display_fill_rect(x0, y0, VOLUME_BOX_W, VOLUME_BOX_H, 0);
+    draw_text(y0 + VOLUME_BAR_MARGIN, text);
+    if (v.adjustable && v.max > v.min) {
+        const int bar_x = x0 + VOLUME_BAR_MARGIN, bar_w = VOLUME_BOX_W - 2 * VOLUME_BAR_MARGIN;
+        const int bar_y = y0 + VOLUME_BOX_H - VOLUME_BAR_MARGIN - VOLUME_BAR_H;
+        float level = (v.value - v.min) / (v.max - v.min);
+        level = level < 0 ? 0 : level > 1 ? 1 : level;
+        const int fill = (int)(bar_w * level);
+        display_fill_rect(bar_x, bar_y, fill, VOLUME_BAR_H, white());
+        display_fill_rect(bar_x + fill, bar_y, bar_w - fill, VOLUME_BAR_H, display_color(0x40, 0x40, 0x40));
+    }
+    display_unlock();
+}
+
+// Factory-reset confirmation: question near the top, an OK button below.
+#define CONFIRM_TITLE_Y   (LCD_HEIGHT / 4)
+#define CONFIRM_BUTTON_W  (LCD_WIDTH / 2)
+#define CONFIRM_BUTTON_H  (TEXT_LINE_PITCH * 2)
+#define CONFIRM_BUTTON_X  ((LCD_WIDTH - CONFIRM_BUTTON_W) / 2)
+#define CONFIRM_BUTTON_Y  (LCD_HEIGHT * 3 / 5)
+#define CONFIRM_BORDER    (2 * UI_SCALE)
+
+void ui_confirm_reset(void)
+{
+    const uint16_t on = white();
+    display_lock();
+    display_fill(0);
+    draw_text(CONFIRM_TITLE_Y, "FACTORY RESET?");
+    draw_text(CONFIRM_TITLE_Y + TEXT_LINE_PITCH * 2, "Erases Wi-Fi");
+    draw_text(CONFIRM_TITLE_Y + TEXT_LINE_PITCH * 3, "and Roon pairing");
+    const int x = CONFIRM_BUTTON_X, y = CONFIRM_BUTTON_Y, w = CONFIRM_BUTTON_W, h = CONFIRM_BUTTON_H;
+    display_fill_rect(x, y, w, CONFIRM_BORDER, on);
+    display_fill_rect(x, y + h - CONFIRM_BORDER, w, CONFIRM_BORDER, on);
+    display_fill_rect(x, y, CONFIRM_BORDER, h, on);
+    display_fill_rect(x + w - CONFIRM_BORDER, y, CONFIRM_BORDER, h, on);
+    draw_text(y + (h - TEXT_HEIGHT) / 2, "OK");
+    display_unlock();
+}
+
+bool ui_confirm_hit(int x, int y)
+{
+    return x >= CONFIRM_BUTTON_X && x < CONFIRM_BUTTON_X + CONFIRM_BUTTON_W && y >= CONFIRM_BUTTON_Y &&
+           y < CONFIRM_BUTTON_Y + CONFIRM_BUTTON_H;
 }
