@@ -10,10 +10,10 @@ boards/<name>/
   sdkconfig.defaults   flash size, PSRAM, partition table path, memory tuning
   partitions.csv       must keep two OTA app slots (ota_0, ota_1) and otadata
   board/               an ESP-IDF component, always named "board"
-    CMakeLists.txt     idf_component_register(... REQUIRES board_interface esp_lcd)
+    CMakeLists.txt     idf_component_register(... REQUIRES board_interface esp_lcd ...)
     idf_component.yml  panel driver and other board-only components
     include/board.h    pins and limits, see components/board_interface
-    panel.c            board_panel_create(): panel type, orientation, colour order
+    board.c            board_init(), board_display_init(), board_display_set_brightness()
 ```
 
 ## Steps
@@ -22,9 +22,12 @@ boards/<name>/
 2. Fill in `include/board.h`. The full list of required macros is in
    `components/board_interface/include/board_interface.h`. Take pins from the
    vendor's BSP or schematic and note the source in a comment.
-3. Implement `board_panel_create()` in `panel.c` with the panel's esp_lcd
-   driver. Mirroring, axis swap, colour inversion and RGB/BGR order are the
-   usual quirks; check them on the real panel.
+3. Implement `board.c`: `board_init()` for power rails and shared buses,
+   `board_display_init()` creating the bus, panel IO and esp_lcd panel (classic
+   SPI panels can use `spi_dc_panel_io()` from `components/board_common`), and
+   `board_display_set_brightness()`. Mirroring, axis swap, colour inversion and
+   RGB/BGR order are the usual quirks; check them on the real panel. Set
+   `LCD_DRAW_ALIGN` if the controller needs drawing areas on a pixel grid.
 4. Size `MOO_MAX_MESSAGE_BYTES` to the memory: boards without PSRAM need about
    100 KB of free internal heap for a cover plus a zone update.
 5. Set `BOARD_HAS_KNOB` to 1 only if the board has a rotary encoder with a

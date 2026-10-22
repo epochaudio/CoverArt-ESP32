@@ -1,13 +1,9 @@
 #include "display.h"
-#include "board_interface.h"
 
 #include <string.h>
+#include "board_interface.h"
 #include "config.h"
-#include "driver/gpio.h"
-#include "driver/spi_master.h"
 #include "esp_heap_caps.h"
-#include "esp_lcd_panel_io.h"
-#include "esp_lcd_panel_ops.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -17,7 +13,9 @@ static esp_lcd_panel_handle_t s_panel;
 static uint16_t *s_bounce;
 static SemaphoreHandle_t s_done;
 
-static bool on_trans_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *ev, void *ctx)
+#define BOUNCE_PIXELS (LCD_WIDTH * LCD_BOUNCE_ROWS)
+
+static bool on_flushed(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *ev, void *ctx)
 {
     BaseType_t woken = pdFALSE;
     xSemaphoreGiveFromISR(s_done, &woken);
@@ -27,66 +25,62 @@ static bool on_trans_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_d
 void display_init(void)
 {
     s_done = xSemaphoreCreateBinary();
-    s_bounce = heap_caps_malloc(LCD_WIDTH * LCD_BOUNCE_ROWS * sizeof(uint16_t), MALLOC_CAP_DMA);
+    s_bounce = heap_caps_malloc(BOUNCE_PIXELS * sizeof(uint16_t), MALLOC_CAP_DMA);
     assert(s_bounce);
-
-    // Backlight off until the first frame is drawn.
-    gpio_config_t bl = {.pin_bit_mask = 1ULL << LCD_PIN_BL, .mode = GPIO_MODE_OUTPUT};
-    ESP_ERROR_CHECK(gpio_config(&bl));
-    gpio_set_level(LCD_PIN_BL, !LCD_BL_ON_LEVEL);
-
-    spi_bus_config_t bus = {
-        .mosi_io_num = LCD_PIN_MOSI,
-        .miso_io_num = -1,
-        .sclk_io_num = LCD_PIN_SCLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = LCD_WIDTH * LCD_BOUNCE_ROWS * sizeof(uint16_t),
-    };
-    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO));
-
-    esp_lcd_panel_io_handle_t io;
-    esp_lcd_panel_io_spi_config_t io_cfg = {
-        .dc_gpio_num = LCD_PIN_DC,
-        .cs_gpio_num = LCD_PIN_CS,
-        .pclk_hz = LCD_SPI_MHZ * 1000 * 1000,
-        .lcd_cmd_bits = 8,
-        .lcd_param_bits = 8,
-        .spi_mode = 0,
-        .trans_queue_depth = 4,
-        .on_color_trans_done = on_trans_done,
-    };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &io_cfg, &io));
-
-    s_panel = board_panel_create(io);
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
-
+    s_panel = board_display_init(on_flushed, NULL);
     display_fill(0);
-    gpio_set_level(LCD_PIN_BL, LCD_BL_ON_LEVEL);
+    board_display_set_brightness(100);
     ESP_LOGI(TAG, "%s panel %dx%d ready", BOARD_NAME, LCD_WIDTH, LCD_HEIGHT);
 }
 
-static void push_rows(int x, int y, int w, int rows)
+void display_set_brightness(uint8_t percent)
 {
-    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(s_panel, x, y, x + w, y + rows, s_bounce));
+    board_display_set_brightness(percent);
+}
+
+static void push(int x, int y, int w, int h)
+{
+    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(s_panel, x, y, x + w, y + h, s_bounce));
     xSemaphoreTake(s_done, portMAX_DELAY);
 }
 
 void display_fill(uint16_t color_be)
 {
-    for (int i = 0; i < LCD_WIDTH * LCD_BOUNCE_ROWS; i++) s_bounce[i] = color_be;
+    for (int i = 0; i < BOUNCE_PIXELS; i++) s_bounce[i] = color_be;
     for (int y = 0; y < LCD_HEIGHT; y += LCD_BOUNCE_ROWS) {
         int rows = LCD_HEIGHT - y < LCD_BOUNCE_ROWS ? LCD_HEIGHT - y : LCD_BOUNCE_ROWS;
-        push_rows(0, y, LCD_WIDTH, rows);
+        push(0, y, LCD_WIDTH, rows);
     }
 }
 
+static int align_down(int v) { return v - v % LCD_DRAW_ALIGN; }
+static int align_up(int v) { return align_down(v + LCD_DRAW_ALIGN - 1); }
+static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// Panels with a drawing grid (LCD_DRAW_ALIGN > 1) get the area widened to the
+// grid; the added border repeats the nearest edge pixel of the source, so the
+// at most LCD_DRAW_ALIGN - 1 extra pixels per side match their neighbours.
 void display_draw(int x, int y, int w, int h, const uint16_t *pixels_be)
 {
-    const int max_rows = (LCD_WIDTH * LCD_BOUNCE_ROWS) / w;
-    for (int row = 0; row < h; row += max_rows) {
-        int rows = h - row < max_rows ? h - row : max_rows;
-        memcpy(s_bounce, pixels_be + (size_t)row * w, (size_t)rows * w * sizeof(uint16_t));
-        push_rows(x, y + row, w, rows);
+    const int x0 = align_down(x), y0 = align_down(y);
+    const int x1 = align_up(x + w) < LCD_WIDTH ? align_up(x + w) : LCD_WIDTH;
+    const int y1 = align_up(y + h) < LCD_HEIGHT ? align_up(y + h) : LCD_HEIGHT;
+    const int out_w = x1 - x0;
+    const int max_rows = align_down(BOUNCE_PIXELS / out_w);
+    const bool padded = x0 != x || out_w != w || y0 != y || y1 != y + h;
+
+    for (int top = y0; top < y1; top += max_rows) {
+        const int rows = y1 - top < max_rows ? y1 - top : max_rows;
+        for (int r = 0; r < rows; r++) {
+            const int src_row = clamp(top + r, y, y + h - 1) - y;
+            const uint16_t *src = pixels_be + (size_t)src_row * w;
+            uint16_t *dst = s_bounce + (size_t)r * out_w;
+            if (!padded) {
+                memcpy(dst, src, (size_t)w * sizeof(uint16_t));
+            } else {
+                for (int c = 0; c < out_w; c++) dst[c] = src[clamp(x0 + c, x, x + w - 1) - x];
+            }
+        }
+        push(x0, top, out_w, rows);
     }
 }

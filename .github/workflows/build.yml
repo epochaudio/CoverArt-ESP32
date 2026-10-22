@@ -22,6 +22,8 @@ jobs:
             target: esp32c3
           - board: box-lite
             target: esp32s3
+          - board: waveshare-amoled-216
+            target: esp32s3
     steps:
       - uses: actions/checkout@v4
       - name: Build ${{ matrix.board }}

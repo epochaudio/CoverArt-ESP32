@@ -1,1 +1,2 @@
-idf_component_register(SRCS "panel.c" INCLUDE_DIRS "include" REQUIRES board_interface esp_lcd)
+idf_component_register(SRCS "board.c" INCLUDE_DIRS "include"
+                       REQUIRES board_interface board_common esp_lcd esp_driver_gpio)

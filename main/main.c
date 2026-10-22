@@ -1,3 +1,4 @@
+#include "board_interface.h"
 #include "display.h"
 #include "factory_reset.h"
 #include "esp_log.h"
@@ -25,6 +26,7 @@ void app_main(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
     ESP_LOGI(TAG, "Roon cover running from %s", running ? running->label : "?");
+    board_init();
     display_init();
     store_init();
     factory_reset_check();

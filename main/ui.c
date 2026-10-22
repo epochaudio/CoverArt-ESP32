@@ -11,7 +11,9 @@
 
 static const char *TAG = "ui";
 
-#define TEXT_SCALE        2
+// Layout is drawn for a 240-pixel-tall panel and scaled up on larger ones.
+#define UI_SCALE          (LCD_HEIGHT / 240)
+#define TEXT_SCALE        (2 * UI_SCALE)
 #define TEXT_ADVANCE      ((FONT5X7_WIDTH + 1) * TEXT_SCALE)
 #define TEXT_HEIGHT       (FONT5X7_HEIGHT * TEXT_SCALE)
 #define TEXT_LINE_PITCH   (TEXT_HEIGHT + 4 * TEXT_SCALE)
@@ -20,13 +22,13 @@ static const char *TAG = "ui";
 // zone on each side so phones find it against the black screen.
 #define QR_MAX_VERSION    5
 #define QR_QUIET_MODULES  2
-#define QR_BOX_PX         100   // fits inside the round panel with text above and below
+#define QR_BOX_PX         (100 * UI_SCALE)  // fits a round panel with text above and below
 
 // Setup screen rows (panel centre is at LCD_HEIGHT / 2).
-#define SETUP_TITLE_Y     36
-#define SETUP_QR_TOP_Y    60
-#define SETUP_HINT_Y      168
-#define SETUP_NAME_Y      186
+#define SETUP_TITLE_Y     (36 * UI_SCALE)
+#define SETUP_QR_TOP_Y    (60 * UI_SCALE)
+#define SETUP_HINT_Y      (168 * UI_SCALE)
+#define SETUP_NAME_Y      (186 * UI_SCALE)
 
 static uint16_t white(void) { return display_color(0xFF, 0xFF, 0xFF); }
 
