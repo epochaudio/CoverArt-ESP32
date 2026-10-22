@@ -6,6 +6,8 @@ Turn an ESP32 display into a Roon album-art screen. The firmware is itself a Roo
 
 **安装 Install:** <https://epochaudio.github.io/CoverArt-ESP32/>（电脑版 Chrome / Edge，USB 连接 · desktop Chrome or Edge over USB）
 
+**使用说明书 Manual:** [docs/manual.md](docs/manual.md)（中文）
+
 ## 功能 Features
 
 - 自动发现 Roon Core，在 Roon 中启用一次即可，断电后自动重连 · Finds Roon Core on its own; enable once in Roon, reconnects after power loss
