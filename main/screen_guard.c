@@ -26,6 +26,7 @@ _Static_assert(LCD_WIDTH - COVER_SIZE >= 4 * SHIFT_STEP_PX && LCD_HEIGHT - COVER
 typedef enum { LEVEL_ON, LEVEL_DIM, LEVEL_OFF } level_t;
 
 static volatile bool s_playing;
+static volatile bool s_face_down;
 static volatile int64_t s_last_activity_ms;
 static volatile level_t s_level = LEVEL_ON;
 static SemaphoreHandle_t s_lock;  // level changes come from the guard and the Roon task
@@ -49,6 +50,7 @@ static void apply(level_t level)
 
 static level_t target_level(int64_t now)
 {
+    if (s_face_down) return LEVEL_OFF;
     if (s_playing) return LEVEL_ON;
     const int64_t idle = now - s_last_activity_ms;
     if (SCREEN_OFF_AFTER_MS && idle >= SCREEN_OFF_AFTER_MS) return LEVEL_OFF;
@@ -98,13 +100,20 @@ void screen_guard_set_playing(bool playing)
     if (playing == s_playing) return;
     s_playing = playing;
     s_last_activity_ms = now_ms();  // stopping starts the idle countdown afresh
-    if (playing) apply(LEVEL_ON);
+    if (playing && !s_face_down) apply(LEVEL_ON);
+}
+
+void screen_guard_set_face_down(bool face_down)
+{
+    s_face_down = face_down;
+    if (face_down) apply(LEVEL_OFF);
+    else screen_guard_wake();
 }
 
 bool screen_guard_wake(void)
 {
     const bool was_dark = s_level != LEVEL_ON;
     s_last_activity_ms = now_ms();
-    apply(LEVEL_ON);
+    if (!s_face_down) apply(LEVEL_ON);
     return was_dark;
 }

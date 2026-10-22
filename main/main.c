@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "knob.h"
+#include "motion.h"
 #include "provision.h"
 #include "roon.h"
 #include "screen_guard.h"
@@ -48,6 +49,7 @@ void app_main(void)
     roon_start();
     knob_start();
     touch_start();
+    motion_start();
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(WIFI_WATCH_PERIOD_MS));
         if (wifi_offline_ms() > WIFI_LOST_RESTART_MS) {

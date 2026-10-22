@@ -27,6 +27,14 @@ typedef struct {
 } roon_volume_t;
 roon_volume_t roon_volume(void);
 
+// Playback state of the selected zone, for gestures that act on state.
+typedef struct {
+    bool known;       // false before the first zone report and while Core is unreachable
+    bool playing, paused;
+    char track[96];   // title of the current track ("" if none)
+} roon_playback_t;
+roon_playback_t roon_playback(void);
+
 // Redraws the current cover, or the current status screen if no cover is up.
 // For overlays (volume, confirmations) that need to give the screen back.
 void roon_redraw(void);

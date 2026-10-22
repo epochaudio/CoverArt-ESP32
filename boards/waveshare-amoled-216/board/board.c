@@ -6,6 +6,7 @@
 #include "esp_lcd_co5300.h"
 #include "esp_lcd_touch_cst9217.h"
 #include "esp_log.h"
+#include "qmi8658.h"
 
 static const char *TAG = "board";
 
@@ -24,6 +25,13 @@ static const char *TAG = "board";
 #define PIN_I2C_SDA     15
 #define I2C_HZ          400000
 #define I2C_PROBE_MS    20
+#define IMU_ADDR        0x6B
+
+// QMI8658 chip axes to panel axes: panel axis i = sign[i] * chip axis axis[i].
+// z verified on hardware (face up +1 g, face down -1 g); x and y are not yet
+// checked and no gesture uses them.
+static const int kImuAxis[3] = {0, 1, 2};
+static const float kImuSign[3] = {1, 1, 1};
 
 static const co5300_lcd_init_cmd_t kPanelInit[] = {
     {0x11, (uint8_t[]){0x00}, 0, 600},  // sleep out
@@ -46,6 +54,7 @@ static const co5300_lcd_init_cmd_t kPanelInit[] = {
 static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_touch_handle_t s_touch;
+static qmi8658_handle_t s_imu;
 
 // Devices expected on the shared I2C bus, logged at boot so a board revision
 // with different parts shows up in the first log.
@@ -106,6 +115,15 @@ void board_init(void)
     ESP_ERROR_CHECK(i2c_new_master_bus(&bus, &s_i2c));
     probe_i2c();
     touch_init();
+    s_imu = qmi8658_open(s_i2c, IMU_ADDR);
+}
+
+bool board_imu_read(float g[3])
+{
+    float chip[3];
+    if (!qmi8658_read_accel(s_imu, chip)) return false;
+    for (int i = 0; i < 3; i++) g[i] = kImuSign[i] * chip[kImuAxis[i]];
+    return true;
 }
 
 esp_lcd_panel_handle_t board_display_init(esp_lcd_panel_io_color_trans_done_cb_t on_flushed, void *ctx)

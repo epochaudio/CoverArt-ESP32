@@ -53,6 +53,10 @@ static const char *TAG = "roon";
 // to enable it. Unpaired devices ask right away.
 #define AUTH_PROMPT_DELAY_MS   5000
 #define VOLUME_MAX_PENDING_STEPS 50
+// Volume may rise by at most this many steps per second (1 dB each on a dB
+// output), whatever the input; lowering is never limited. Raises beyond the
+// budget wait like other pending turns and are dropped when they go stale.
+#define VOLUME_RAISE_MAX_STEPS_PER_SEC 6
 
 // Shown only until the first cover of this boot; afterwards the last cover
 // stays up and state changes go to the log.
@@ -94,6 +98,8 @@ static session_t s;
 static char s_output_id[96], s_output_name[96];
 static bool s_cover_shown;
 static char s_extension_id[64], s_display_name[64];
+static roon_playback_t s_playback;
+static portMUX_TYPE s_playback_lock = portMUX_INITIALIZER_UNLOCKED;
 static roon_volume_t s_volume;  // written by the Roon task, read by input tasks (a torn read only mis-shows one value)
 // Address of the current session and whether it came from the NVS cache
 // rather than a fresh SOOD answer.
@@ -253,6 +259,18 @@ static void update_volume_support(const cJSON *zone)
     }
 }
 
+static void record_playback(const char *state, const cJSON *now_playing)
+{
+    roon_playback_t pb = {.known = true};
+    pb.playing = state && strcmp(state, "playing") == 0;
+    pb.paused = state && strcmp(state, "paused") == 0;
+    const cJSON *line = cJSON_GetObjectItemCaseSensitive(now_playing, "one_line");
+    strlcpy(pb.track, str_of(line, "line1") ?: "", sizeof(pb.track));
+    taskENTER_CRITICAL(&s_playback_lock);
+    s_playback = pb;
+    taskEXIT_CRITICAL(&s_playback_lock);
+}
+
 // Applies one zone object if it holds the selected output. Paused or stopped
 // keeps the last cover; a track without artwork blanks the screen.
 static void apply_zone(const char *text, size_t len, void *ctx)
@@ -269,6 +287,7 @@ static void apply_zone(const char *text, size_t len, void *ctx)
     const char *state = str_of(zone, "state");
     screen_guard_set_playing(state && strcmp(state, "playing") == 0);
     const cJSON *np = cJSON_GetObjectItemCaseSensitive(zone, "now_playing");
+    record_playback(state, np);
     if (!np) {  // stopped: keep the last cover, or say so if none was shown yet
         show_status(UI_NOTHING_PLAYING);
         goto done;
@@ -437,6 +456,20 @@ static void send_control(roon_control_t control)
 
 // Sends coalesced knob turns, one change_volume in flight at a time, so a fast
 // spin becomes a few larger steps rather than a backlog of small ones.
+// Token bucket for volume raises, refilled at VOLUME_RAISE_MAX_STEPS_PER_SEC.
+static float s_raise_budget = VOLUME_RAISE_MAX_STEPS_PER_SEC;
+static int64_t s_raise_budget_ms;
+
+static int allowed_steps(int steps, int64_t now)
+{
+    s_raise_budget += (now - s_raise_budget_ms) * VOLUME_RAISE_MAX_STEPS_PER_SEC / 1000.0f;
+    if (s_raise_budget > VOLUME_RAISE_MAX_STEPS_PER_SEC) s_raise_budget = VOLUME_RAISE_MAX_STEPS_PER_SEC;
+    s_raise_budget_ms = now;
+    if (steps <= 0) return steps;
+    const int budget = (int)s_raise_budget;
+    return steps < budget ? steps : budget;
+}
+
 static void flush_volume(void)
 {
     const int64_t now = now_ms();
@@ -449,14 +482,17 @@ static void flush_volume(void)
         s.pending_volume_steps = 0;
     }
     if (!s.pending_volume_steps || s.volume_id || !controls_ready()) return;
+    const int steps = allowed_steps(s.pending_volume_steps, now);
+    if (steps == 0) return;  // raise budget used up for now
+    if (steps > 0) s_raise_budget -= steps;
     cJSON *b = cJSON_CreateObject();
     cJSON_AddStringToObject(b, "output_id", s_output_id);
     cJSON_AddStringToObject(b, "how", "relative_step");
-    cJSON_AddNumberToObject(b, "value", s.pending_volume_steps);
+    cJSON_AddNumberToObject(b, "value", steps);
     s.volume_id = send_request(SVC_TRANSPORT "/change_volume", b);
     s.volume_sent_ms = now;
-    ESP_LOGI(TAG, "volume %+d steps", s.pending_volume_steps);
-    s.pending_volume_steps = 0;
+    ESP_LOGI(TAG, "volume %+d steps", steps);
+    s.pending_volume_steps -= steps;
 }
 
 static void on_control_event(const event_t *ev)
@@ -760,6 +796,9 @@ static bool run_session(const char *host, uint16_t port)
         }
     }
     screen_guard_set_playing(false);  // unknown while Core is unreachable: let the screen rest
+    taskENTER_CRITICAL(&s_playback_lock);
+    s_playback.known = false;
+    taskEXIT_CRITICAL(&s_playback_lock);
     esp_websocket_client_stop(s_ws);
     esp_websocket_client_destroy(s_ws);
     s_ws = NULL;
@@ -819,6 +858,14 @@ void roon_control(roon_control_t control)
 void roon_change_volume(int steps)
 {
     post_input(EV_VOLUME, steps);
+}
+
+roon_playback_t roon_playback(void)
+{
+    taskENTER_CRITICAL(&s_playback_lock);
+    roon_playback_t pb = s_playback;
+    taskEXIT_CRITICAL(&s_playback_lock);
+    return pb;
 }
 
 roon_volume_t roon_volume(void)

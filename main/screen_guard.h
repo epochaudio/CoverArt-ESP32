@@ -13,6 +13,9 @@ void screen_guard_start(void);
 // Selected zone is playing (false also while Roon Core is unreachable).
 void screen_guard_set_playing(bool playing);
 
+// Device lying screen-down: dark until turned back up (which counts as activity).
+void screen_guard_set_face_down(bool face_down);
+
 // Something happened worth looking at. Returns true if the screen was dimmed
 // or dark, so an input that only woke it can be swallowed.
 bool screen_guard_wake(void);
