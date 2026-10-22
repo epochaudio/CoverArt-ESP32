@@ -22,6 +22,7 @@
 //   BOARD_HAS_TOUCH              1 if board_touch_read() is implemented
 //   BOARD_HAS_IMU                1 if board_imu_read() is implemented
 //   BOARD_HAS_BATTERY            1 if board_battery_read() is implemented
+//   BOARD_CAN_POWER_OFF          1 if board_power_off() is implemented
 //   SCREEN_DIM_AFTER_MS, SCREEN_OFF_AFTER_MS, SCREEN_DIM_PERCENT,
 //   SCREEN_PIXEL_SHIFT           idle dimming and burn-in protection, see
 //                                main/screen_guard.h (0 = off)
@@ -61,3 +62,7 @@ typedef struct {
     int millivolts;
 } board_battery_t;
 bool board_battery_read(board_battery_t *out);
+
+// BOARD_CAN_POWER_OFF boards: switch the board off; it does not return. The
+// board's own power key or USB brings it back.
+void board_power_off(void);

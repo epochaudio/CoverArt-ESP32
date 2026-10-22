@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "input.h"
+#include "power.h"
 #include "roon.h"
 #include "screen_guard.h"
 
@@ -27,6 +28,9 @@ static const char *TAG = "motion";
 #define FACE_UP_Z_G               (-0.3f)
 #define FACE_UP_HOLD_MS           300
 #define MOTION_RESUME_WINDOW_MS   (30 * 60 * 1000)
+// Lying face down this long on battery switches the device off (on USB the
+// screen just stays dark: no battery to save).
+#define MOTION_POWER_OFF_MS       (30 * 60 * 1000)
 // Pick-up: the filtered gravity vector moves this far from where it rested.
 #define PICKUP_DELTA_G            0.15f
 #define REST_ALPHA                0.02f  // how fast the rest position follows
@@ -43,6 +47,7 @@ typedef struct {
     float f[3];             // filtered acceleration
     float rest[3];          // slowly following position while still
     bool face_down;
+    int64_t face_down_since;
     int64_t candidate_since;  // when the opposite orientation was first seen
     bool flip_paused;       // face-down paused playback...
     int64_t flip_paused_at;
@@ -52,6 +57,7 @@ typedef struct {
 static void on_face_down(motion_t *m, int64_t now)
 {
     m->face_down = true;
+    m->face_down_since = now;
     screen_guard_set_face_down(true);
     const roon_playback_t pb = roon_playback();
     m->flip_paused = false;
@@ -93,6 +99,16 @@ static void step(motion_t *m, const float g[3], int64_t now)
         if (m->face_down) on_face_up(m, now);
         else if (!input_touching()) on_face_down(m, now);
     }
+
+#if BOARD_CAN_POWER_OFF
+    if (m->face_down && now - m->face_down_since >= MOTION_POWER_OFF_MS) {
+        const board_battery_t pw = power_status();
+        if (pw.battery && !pw.usb_power) {
+            ESP_LOGI(TAG, "face down for %d min on battery", MOTION_POWER_OFF_MS / 60000);
+            board_power_off();
+        }
+    }
+#endif
 
     // Pick-up: movement away from the rest position wakes the screen.
     const float moved = sqrtf((m->f[0] - m->rest[0]) * (m->f[0] - m->rest[0]) +

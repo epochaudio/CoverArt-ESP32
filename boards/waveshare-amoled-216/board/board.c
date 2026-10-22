@@ -6,6 +6,8 @@
 #include "esp_lcd_co5300.h"
 #include "esp_lcd_touch_cst9217.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "qmi8658.h"
 #include "axp2101.h"
 
@@ -119,6 +121,13 @@ void board_init(void)
     touch_init();
     s_imu = qmi8658_open(s_i2c, IMU_ADDR);
     s_pmu = axp2101_open(s_i2c);
+}
+
+void board_power_off(void)
+{
+    ESP_LOGW(TAG, "powering off");
+    axp2101_power_off(s_pmu);
+    for (;;) vTaskDelay(portMAX_DELAY);  // the rails drop; nothing runs after this
 }
 
 bool board_battery_read(board_battery_t *out)

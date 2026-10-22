@@ -9,6 +9,9 @@
   next to the zone, on boards whose panel can dim (AMOLED-2.16). Dimming and
   the low-battery cap never exceed it.
 - Saving the extension settings re-reads the zone only when it changed.
+- Lying face down for 30 minutes on battery switches the device off (AMOLED-2.16,
+  AXP2101 software power-off); on USB the screen only stays dark. The PWR
+  key or USB switches it back on.
 - Fixed: the status line in Roon > Settings > Extensions (connection, zone
   and battery level) never appeared. The status service is
   `com.roonlabs.status:1`, not `:2`; Core ignored the unknown name.

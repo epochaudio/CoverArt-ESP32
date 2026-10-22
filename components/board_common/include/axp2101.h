@@ -15,6 +15,10 @@ typedef struct {
     int millivolts;      // battery voltage
 } axp2101_status_t;
 
+// Switches the whole board off (the chip's software power-off). It comes
+// back with a short press of the power key or when USB is plugged in.
+void axp2101_power_off(axp2101_handle_t pmu);
+
 // Enables battery detection, voltage measurement and the fuel gauge.
 axp2101_handle_t axp2101_open(i2c_master_bus_handle_t bus);
 bool axp2101_read(axp2101_handle_t pmu, axp2101_status_t *out);

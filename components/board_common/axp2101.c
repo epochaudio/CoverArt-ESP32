@@ -9,6 +9,8 @@ static const char *TAG = "axp2101";
 #define AXP2101_ADDR          0x34
 #define REG_STATUS1           0x00   // bit 5 VBUS good, bit 3 battery present
 #define REG_STATUS2           0x01   // bits 6:5 battery current: 01 charging, 10 discharging
+#define REG_COMMON_CONFIG     0x10   // bit 0 software power-off
+#define COMMON_POWER_OFF      0x01
 #define REG_GAUGE_CTRL        0x18   // bit 3 fuel gauge enable
 #define REG_ADC_ENABLE        0x30   // bit 0 battery voltage measurement
 #define REG_VBAT_H            0x34   // bits 5:0, then REG_VBAT_L: battery mV
@@ -72,4 +74,9 @@ bool axp2101_read(axp2101_handle_t pmu, axp2101_status_t *out)
     out->millivolts = ((vbat[0] & 0x3F) << 8) | vbat[1];
     out->percent = out->battery && pct <= 100 ? pct : -1;
     return true;
+}
+
+void axp2101_power_off(axp2101_handle_t pmu)
+{
+    if (pmu) set_bits(pmu->dev, REG_COMMON_CONFIG, COMMON_POWER_OFF);
 }

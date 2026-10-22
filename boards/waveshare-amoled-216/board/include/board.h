@@ -27,6 +27,8 @@
 #define BOARD_HAS_IMU    1
 // AXP2101 power management with an optional LiPo battery.
 #define BOARD_HAS_BATTERY 1
+// AXP2101 software power-off; the PWR key switches it back on.
+#define BOARD_CAN_POWER_OFF 1
 #define BOARD_HAS_KNOB   0
 
 // Screen guard (main/screen_guard.h): AMOLED burn-in and battery.

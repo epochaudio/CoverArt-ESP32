@@ -5,5 +5,6 @@
 //   turn back up         screen on; resume only if face-down paused it, within
 //                        MOTION_RESUME_WINDOW_MS, and nothing changed meanwhile
 //   pick up or move      wake a dimmed or dark screen
+//   face down 30 min     switch off, on battery only (BOARD_CAN_POWER_OFF)
 // Ignored while a finger is on the screen.
 void motion_start(void);
