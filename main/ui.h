@@ -11,10 +11,6 @@ void ui_message(const char *const lines[], int count);
 // Setup screen: a QR code that joins the open setup network, plus its name.
 void ui_setup(const char *ap_ssid);
 
-// Current volume of the selected output over the middle of the screen.
-// Callers restore the screen with roon_redraw() when done.
-void ui_volume_overlay(void);
-
 // Battery badge for covers; draws nothing unless the battery is low.
 void ui_battery_badge(void);
 

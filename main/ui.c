@@ -9,7 +9,6 @@
 #include "font5x7.h"
 #include "qrcode.h"
 #include "power.h"
-#include "roon.h"
 
 static const char *TAG = "ui";
 
@@ -103,36 +102,6 @@ void ui_setup(const char *ap_ssid)
 }
 
 // ---------------------------------------------------------------- overlays
-
-// Volume box in the middle of the screen: value text above a level bar.
-#define VOLUME_BOX_W      (LCD_WIDTH * 3 / 5)
-#define VOLUME_BOX_H      (TEXT_LINE_PITCH * 3)
-#define VOLUME_BAR_H      (TEXT_HEIGHT / 2)
-#define VOLUME_BAR_MARGIN (TEXT_LINE_PITCH / 2)
-
-void ui_volume_overlay(void)
-{
-    const roon_volume_t v = roon_volume();
-    const int x0 = (LCD_WIDTH - VOLUME_BOX_W) / 2, y0 = (LCD_HEIGHT - VOLUME_BOX_H) / 2;
-    char text[24];
-    if (!v.adjustable) snprintf(text, sizeof(text), "FIXED VOLUME");
-    else if (v.is_db) snprintf(text, sizeof(text), "%.1f dB", v.value);
-    else snprintf(text, sizeof(text), "%d", (int)v.value);
-
-    display_lock();
-    display_fill_rect(x0, y0, VOLUME_BOX_W, VOLUME_BOX_H, 0);
-    draw_text(y0 + VOLUME_BAR_MARGIN, text);
-    if (v.adjustable && v.max > v.min) {
-        const int bar_x = x0 + VOLUME_BAR_MARGIN, bar_w = VOLUME_BOX_W - 2 * VOLUME_BAR_MARGIN;
-        const int bar_y = y0 + VOLUME_BOX_H - VOLUME_BAR_MARGIN - VOLUME_BAR_H;
-        float level = (v.value - v.min) / (v.max - v.min);
-        level = level < 0 ? 0 : level > 1 ? 1 : level;
-        const int fill = (int)(bar_w * level);
-        display_fill_rect(bar_x, bar_y, fill, VOLUME_BAR_H, white());
-        display_fill_rect(bar_x + fill, bar_y, bar_w - fill, VOLUME_BAR_H, display_color(0x40, 0x40, 0x40));
-    }
-    display_unlock();
-}
 
 // Factory-reset confirmation: question near the top, an OK button below.
 #define CONFIRM_TITLE_Y   (LCD_HEIGHT / 4)

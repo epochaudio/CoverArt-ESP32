@@ -25,22 +25,12 @@ static const char *TAG = "touch";
 #define TAP_MAX_MS             400
 #define SWIPE_MIN_PX           (LCD_WIDTH / 5)
 #define SWIPE_MAX_MS           800
-// Touches starting this far from the centre can drive the volume ring; a
-// path that dips well inside it is a swipe instead.
-#define RING_INNER_PX          (LCD_WIDTH / 3)
-#define RING_LEAVE_PX          (RING_INNER_PX * 3 / 4)
-#define TOUCH_ARC_STEP_DEG     12.0f
-// One ring gesture can raise the volume by at most this many steps (1 dB
-// each on a dB output), so a slip of the finger cannot blast the speakers.
-#define ARC_MAX_RAISE_STEPS    10
-#define OVERLAY_HOLD_MS        2000
 #define LONG_PRESS_MS          10000
 #define CONFIRM_WINDOW_MS      10000
 
 typedef enum {
     STATE_IDLE,
     STATE_PRESSED,         // finger down, gesture not decided yet
-    STATE_RING,            // dragging along the volume ring
     STATE_IGNORE,          // touch only woke the screen; wait for release
     STATE_CONFIRM_RELEASE, // reset question shown, waiting for the holding finger to lift
     STATE_CONFIRM,         // waiting for a tap on OK
@@ -51,54 +41,14 @@ static int64_t now_ms(void)
     return esp_timer_get_time() / 1000;
 }
 
-static float angle_deg(int x, int y)
-{
-    return atan2f((float)(y - LCD_HEIGHT / 2), (float)(x - LCD_WIDTH / 2)) * 180.0f / (float)M_PI;
-}
-
-static int distance_from_centre(int x, int y)
-{
-    return (int)hypotf((float)(x - LCD_WIDTH / 2), (float)(y - LCD_HEIGHT / 2));
-}
-
 typedef struct {
     state_t state;
     int x0, y0;            // where the finger went down
     int x, y;              // latest position
     int64_t down_ms;
     int max_travel;
-    bool ring_candidate;
-    float last_angle, angle_acc;
-    int raised_steps;
-    int64_t overlay_ms;    // last volume change shown; 0 when no overlay is up
-    float overlay_value;
     int64_t confirm_deadline_ms;
 } gesture_t;
-
-static void show_volume(gesture_t *g)
-{
-    ui_volume_overlay();
-    g->overlay_value = roon_volume().value;
-    g->overlay_ms = now_ms();
-}
-
-static void ring_move(gesture_t *g)
-{
-    const float a = angle_deg(g->x, g->y);
-    float delta = a - g->last_angle;
-    if (delta > 180.0f) delta -= 360.0f;
-    if (delta < -180.0f) delta += 360.0f;
-    g->last_angle = a;
-    g->angle_acc += delta;
-    int steps = 0;
-    while (g->angle_acc >= TOUCH_ARC_STEP_DEG) { g->angle_acc -= TOUCH_ARC_STEP_DEG; steps++; }
-    while (g->angle_acc <= -TOUCH_ARC_STEP_DEG) { g->angle_acc += TOUCH_ARC_STEP_DEG; steps--; }
-    if (steps > ARC_MAX_RAISE_STEPS - g->raised_steps) steps = ARC_MAX_RAISE_STEPS - g->raised_steps;
-    if (steps == 0) return;
-    if (steps > 0) g->raised_steps += steps;
-    input_volume(INPUT_SOURCE_TOUCH, steps);
-    show_volume(g);
-}
 
 static void on_release(gesture_t *g, int64_t now)
 {
@@ -131,10 +81,6 @@ static void step(gesture_t *g, bool down, int x, int y, int64_t now)
         g->y0 = y;
         g->down_ms = now;
         g->max_travel = 0;
-        g->ring_candidate = distance_from_centre(x, y) >= RING_INNER_PX;
-        g->last_angle = angle_deg(x, y);
-        g->angle_acc = 0;
-        g->raised_steps = 0;
         g->state = STATE_PRESSED;
         break;
 
@@ -148,20 +94,11 @@ static void step(gesture_t *g, bool down, int x, int y, int64_t now)
             const int travel = (int)hypotf((float)(x - g->x0), (float)(y - g->y0));
             if (travel > g->max_travel) g->max_travel = travel;
         }
-        if (g->ring_candidate && distance_from_centre(x, y) < RING_LEAVE_PX) g->ring_candidate = false;
-        if (g->ring_candidate && g->max_travel > TAP_SLOP_PX) {
-            g->state = STATE_RING;
-            ring_move(g);
-        } else if (g->max_travel <= TAP_SLOP_PX && now - g->down_ms >= LONG_PRESS_MS) {
+        if (g->max_travel <= TAP_SLOP_PX && now - g->down_ms >= LONG_PRESS_MS) {
             ESP_LOGW(TAG, "long press: asking to confirm factory reset");
             ui_confirm_reset();
             g->state = STATE_CONFIRM_RELEASE;
         }
-        break;
-
-    case STATE_RING:
-        if (down) ring_move(g);
-        else g->state = STATE_IDLE;
         break;
 
     case STATE_IGNORE:
@@ -202,19 +139,7 @@ static void touch_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(TOUCH_POLL_MS));
         uint16_t x = 0, y = 0;
         const bool down = board_touch_read(&x, &y);
-        const int64_t now = now_ms();
-        step(&g, down, x, y, now);
-
-        // Keep the volume overlay current while Core reports the new value,
-        // then give the screen back.
-        if (g.overlay_ms) {
-            const roon_volume_t v = roon_volume();
-            if (v.value != g.overlay_value) show_volume(&g);
-            else if (now - g.overlay_ms >= OVERLAY_HOLD_MS && g.state != STATE_RING) {
-                g.overlay_ms = 0;
-                roon_redraw();
-            }
-        }
+        step(&g, down, x, y, now_ms());
     }
 }
 

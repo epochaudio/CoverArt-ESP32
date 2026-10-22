@@ -101,7 +101,6 @@ static bool s_cover_shown;
 static char s_extension_id[64], s_display_name[64];
 static roon_playback_t s_playback;
 static portMUX_TYPE s_playback_lock = portMUX_INITIALIZER_UNLOCKED;
-static roon_volume_t s_volume;  // written by the Roon task, read by input tasks (a torn read only mis-shows one value)
 // Address of the current session and whether it came from the NVS cache
 // rather than a fresh SOOD answer.
 static char s_core_host[16];
@@ -235,16 +234,6 @@ static void update_volume_support(const cJSON *zone)
         if (!id || strcmp(id, s_output_id) != 0) continue;
         const cJSON *volume = cJSON_GetObjectItemCaseSensitive(output, "volume");
         bool supported = cJSON_IsObject(volume);
-        roon_volume_t v = {.adjustable = supported};
-        if (supported) {
-            const cJSON *f;
-            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "value"))) v.value = f->valuedouble;
-            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "min"))) v.min = f->valuedouble;
-            if (cJSON_IsNumber(f = cJSON_GetObjectItemCaseSensitive(volume, "max"))) v.max = f->valuedouble;
-            const char *type = str_of(volume, "type");
-            v.is_db = type && strcmp(type, "db") == 0;
-        }
-        s_volume = v;
         if (supported != s.volume_supported) {
             s.volume_supported = supported;
             if (supported) {
@@ -889,11 +878,6 @@ roon_playback_t roon_playback(void)
     roon_playback_t pb = s_playback;
     taskEXIT_CRITICAL(&s_playback_lock);
     return pb;
-}
-
-roon_volume_t roon_volume(void)
-{
-    return s_volume;
 }
 
 void roon_redraw(void)

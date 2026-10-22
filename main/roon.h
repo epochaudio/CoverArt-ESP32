@@ -19,14 +19,6 @@ void roon_control(roon_control_t control);
 // Positive steps raise the volume, in the output's own step size.
 void roon_change_volume(int steps);
 
-// Volume of the selected output as last reported by Core.
-typedef struct {
-    bool adjustable;  // false for fixed-volume outputs or before the first report
-    float value, min, max;
-    bool is_db;       // value in dB, else on a 0..max number scale
-} roon_volume_t;
-roon_volume_t roon_volume(void);
-
 // Playback state of the selected zone, for gestures that act on state.
 typedef struct {
     bool known;       // false before the first zone report and while Core is unreachable
