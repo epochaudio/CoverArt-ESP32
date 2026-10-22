@@ -3,6 +3,7 @@
 #include "config.h"
 #include "cover.h"
 #include "display.h"
+#include "power.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -14,6 +15,7 @@ static const char *TAG = "screen";
 #define GUARD_TICK_MS         1000
 #define GUARD_TASK_STACK      4096
 #define FULL_BRIGHTNESS       100
+#define LOW_BATTERY_BRIGHTNESS 50
 // Pixel shift: step around a small square, one step per period, while lit.
 #define SHIFT_PERIOD_MS       (3 * 60 * 1000)
 #define SHIFT_STEP_PX         2
@@ -29,6 +31,7 @@ static volatile bool s_playing;
 static volatile bool s_face_down;
 static volatile int64_t s_last_activity_ms;
 static volatile level_t s_level = LEVEL_ON;
+static int s_applied_percent = FULL_BRIGHTNESS;
 static SemaphoreHandle_t s_lock;  // level changes come from the guard and the Roon task
 
 static int64_t now_ms(void)
@@ -39,11 +42,15 @@ static int64_t now_ms(void)
 static void apply(level_t level)
 {
     static const char *names[] = {"on", "dim", "off"};
+    const int full = power_low() ? LOW_BATTERY_BRIGHTNESS : FULL_BRIGHTNESS;
+    const int dim = SCREEN_DIM_PERCENT < full ? SCREEN_DIM_PERCENT : full;
+    const int percent = level == LEVEL_ON ? full : level == LEVEL_DIM ? dim : 0;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (level != s_level) {
-        s_level = level;
-        display_set_brightness(level == LEVEL_ON ? FULL_BRIGHTNESS : level == LEVEL_DIM ? SCREEN_DIM_PERCENT : 0);
-        ESP_LOGI(TAG, "screen %s", names[level]);
+    if (level != s_level) ESP_LOGI(TAG, "screen %s", names[level]);
+    s_level = level;
+    if (percent != s_applied_percent) {
+        display_set_brightness(percent);
+        s_applied_percent = percent;
     }
     xSemaphoreGive(s_lock);
 }

@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "font5x7.h"
 #include "qrcode.h"
+#include "power.h"
 #include "roon.h"
 
 static const char *TAG = "ui";
@@ -162,4 +163,31 @@ bool ui_confirm_hit(int x, int y)
 {
     return x >= CONFIRM_BUTTON_X && x < CONFIRM_BUTTON_X + CONFIRM_BUTTON_W && y >= CONFIRM_BUTTON_Y &&
            y < CONFIRM_BUTTON_Y + CONFIRM_BUTTON_H;
+}
+
+// Low-battery badge at the top centre of the cover: outline and charge level.
+#define BADGE_W       (24 * UI_SCALE)
+#define BADGE_H       (12 * UI_SCALE)
+#define BADGE_NUB_W   (2 * UI_SCALE)
+#define BADGE_NUB_H   (6 * UI_SCALE)
+#define BADGE_TOP     (10 * UI_SCALE)
+#define BADGE_LINE    (1 * UI_SCALE)
+
+void ui_battery_badge(void)
+{
+    if (!power_low()) return;
+    const uint16_t red = display_color(0xE0, 0x30, 0x30);
+    const int x = (LCD_WIDTH - BADGE_W) / 2, y = BADGE_TOP;
+    const int level = power_status().percent;
+    display_lock();
+    display_fill_rect(x - BADGE_LINE, y - BADGE_LINE, BADGE_W + BADGE_NUB_W + 2 * BADGE_LINE, BADGE_H + 2 * BADGE_LINE, 0);
+    display_fill_rect(x, y, BADGE_W, BADGE_LINE, red);
+    display_fill_rect(x, y + BADGE_H - BADGE_LINE, BADGE_W, BADGE_LINE, red);
+    display_fill_rect(x, y, BADGE_LINE, BADGE_H, red);
+    display_fill_rect(x + BADGE_W - BADGE_LINE, y, BADGE_LINE, BADGE_H, red);
+    display_fill_rect(x + BADGE_W, y + (BADGE_H - BADGE_NUB_H) / 2, BADGE_NUB_W, BADGE_NUB_H, red);
+    const int inner = BADGE_W - 4 * BADGE_LINE;
+    display_fill_rect(x + 2 * BADGE_LINE, y + 2 * BADGE_LINE, inner * level / 100 + BADGE_LINE,
+                      BADGE_H - 4 * BADGE_LINE, red);
+    display_unlock();
 }

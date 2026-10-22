@@ -17,6 +17,7 @@
 // The front keys are not used yet.
 #define BOARD_HAS_TOUCH  0
 #define BOARD_HAS_IMU    0
+#define BOARD_HAS_BATTERY 0
 #define BOARD_HAS_KNOB   0
 
 // Screen guard (main/screen_guard.h): an LCD stays lit.

@@ -57,6 +57,12 @@ static uint8_t *s_last_jpeg;
 static size_t s_last_len;
 static bool s_on_screen;
 static int s_dx, s_dy;
+static void (*s_overlay)(void);
+
+void cover_set_overlay(void (*draw_overlay)(void))
+{
+    s_overlay = draw_overlay;
+}
 
 void cover_clear(void)
 {
@@ -104,6 +110,7 @@ static bool draw(const uint8_t *jpeg, size_t len)
     display_lock();
     fill_margins(ctx.x0, ctx.y0, jd.width, jd.height);
     res = jd_decomp(&jd, write_block, 0);
+    if (res == JDR_OK && s_overlay) s_overlay();
     display_unlock();
     ok = res == JDR_OK;
     if (ok) {

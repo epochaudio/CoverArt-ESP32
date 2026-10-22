@@ -17,6 +17,7 @@
 #include "json_scan.h"
 #include "moo.h"
 #include "sood.h"
+#include "power.h"
 #include "screen_guard.h"
 #include "store.h"
 #include "ui.h"
@@ -352,15 +353,36 @@ static void subscribe_zones(void)
 // Line shown under the extension in Roon > Settings > Extensions.
 static cJSON *status_body(void)
 {
-    char message[160];
+    char battery[48] = "";
+    char message[64 + sizeof(s_output_name) + sizeof(battery)];
+    const board_battery_t pw = power_status();
+    if (pw.battery && pw.percent >= 0)
+        snprintf(battery, sizeof(battery), " · 电量 %d%%%s", pw.percent, pw.charging ? "（充电中）" : "");
     if (s_output_id[0])
-        snprintf(message, sizeof(message), "已连接 Roon Core，显示 %s", s_output_name);
+        snprintf(message, sizeof(message), "已连接 Roon Core，显示 %s%s", s_output_name, battery);
     else
-        snprintf(message, sizeof(message), "已连接 Roon Core，请在设置中选择 Zone");
+        snprintf(message, sizeof(message), "已连接 Roon Core，请在设置中选择 Zone%s", battery);
     cJSON *b = cJSON_CreateObject();
     cJSON_AddStringToObject(b, "message", message);
     cJSON_AddBoolToObject(b, "is_error", false);
     return b;
+}
+
+// Battery as shown in the status line: present, charging, level in 5% steps.
+static int battery_report(void)
+{
+    const board_battery_t pw = power_status();
+    if (!pw.battery || pw.percent < 0) return -1;
+    return (pw.percent / 5) * 2 + (pw.charging ? 1 : 0);
+}
+
+static bool battery_report_changed(void)
+{
+    static int last = -1;
+    const int now = battery_report();
+    if (now == last) return false;
+    last = now;
+    return true;
 }
 
 static void publish_status(void)
@@ -781,6 +803,7 @@ static bool run_session(const char *host, uint16_t port)
             }
         }
         if (open) flush_volume();
+        if (open && battery_report_changed()) publish_status();
         if (s.register_sent_ms && now_ms() - s.register_sent_ms > AUTH_PROMPT_DELAY_MS) {
             s.register_sent_ms = 0;
             show_status(UI_AWAITING_AUTH);

@@ -8,6 +8,8 @@
 bool cover_show_jpeg(const uint8_t *jpeg, size_t len);
 // Blank screen for a track that has no artwork.
 void cover_clear(void);
+// Drawn on top of every cover (e.g. a battery badge); NULL for none.
+void cover_set_overlay(void (*draw_overlay)(void));
 // Redraws the current cover after an overlay. False if no cover is up (or the
 // board does not keep it), leaving the screen to the caller.
 bool cover_redraw(void);

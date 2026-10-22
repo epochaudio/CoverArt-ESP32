@@ -15,6 +15,9 @@ void ui_setup(const char *ap_ssid);
 // Callers restore the screen with roon_redraw() when done.
 void ui_volume_overlay(void);
 
+// Battery badge for covers; draws nothing unless the battery is low.
+void ui_battery_badge(void);
+
 // Factory-reset question with an OK button; ui_confirm_hit() tests a touch.
 void ui_confirm_reset(void);
 bool ui_confirm_hit(int x, int y);

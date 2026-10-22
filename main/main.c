@@ -1,4 +1,6 @@
 #include "board_interface.h"
+#include "config.h"
+#include "cover.h"
 #include "display.h"
 #include "factory_reset.h"
 #include "esp_log.h"
@@ -8,6 +10,7 @@
 #include "freertos/task.h"
 #include "knob.h"
 #include "motion.h"
+#include "power.h"
 #include "provision.h"
 #include "roon.h"
 #include "screen_guard.h"
@@ -45,6 +48,8 @@ void app_main(void)
         provision_run();
     }
 
+    power_start();
+    if (BOARD_HAS_BATTERY) cover_set_overlay(ui_battery_badge);
     screen_guard_start();
     roon_start();
     knob_start();

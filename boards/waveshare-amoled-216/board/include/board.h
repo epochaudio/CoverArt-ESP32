@@ -20,6 +20,8 @@
 #define BOARD_HAS_TOUCH  1
 // QMI8658 accelerometer for face-down and pick-up gestures.
 #define BOARD_HAS_IMU    1
+// AXP2101 power management with an optional LiPo battery.
+#define BOARD_HAS_BATTERY 1
 #define BOARD_HAS_KNOB   0
 
 // Screen guard (main/screen_guard.h): AMOLED burn-in and battery.

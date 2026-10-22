@@ -17,6 +17,7 @@
 //   BOARD_HAS_KNOB               1 with KNOB_PIN_A, KNOB_PIN_B, KNOB_PIN_PRESS
 //   BOARD_HAS_TOUCH              1 if board_touch_read() is implemented
 //   BOARD_HAS_IMU                1 if board_imu_read() is implemented
+//   BOARD_HAS_BATTERY            1 if board_battery_read() is implemented
 //   SCREEN_DIM_AFTER_MS, SCREEN_OFF_AFTER_MS, SCREEN_DIM_PERCENT,
 //   SCREEN_PIXEL_SHIFT           idle dimming and burn-in protection, see
 //                                main/screen_guard.h (0 = off)
@@ -46,3 +47,13 @@ bool board_touch_read(uint16_t *x, uint16_t *y);
 // the image, y down the image, z out of the screen towards the viewer. Lying
 // flat face up therefore reads about (0, 0, +1).
 bool board_imu_read(float g[3]);
+
+// BOARD_HAS_BATTERY boards.
+typedef struct {
+    bool usb_power;   // running from USB (and charging if a battery is there)
+    bool battery;     // a battery is connected
+    bool charging;
+    int percent;      // 0..100, -1 if unknown
+    int millivolts;
+} board_battery_t;
+bool board_battery_read(board_battery_t *out);

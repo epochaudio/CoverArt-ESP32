@@ -7,6 +7,7 @@
 #include "esp_lcd_touch_cst9217.h"
 #include "esp_log.h"
 #include "qmi8658.h"
+#include "axp2101.h"
 
 static const char *TAG = "board";
 
@@ -55,6 +56,7 @@ static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_touch_handle_t s_touch;
 static qmi8658_handle_t s_imu;
+static axp2101_handle_t s_pmu;
 
 // Devices expected on the shared I2C bus, logged at boot so a board revision
 // with different parts shows up in the first log.
@@ -116,6 +118,16 @@ void board_init(void)
     probe_i2c();
     touch_init();
     s_imu = qmi8658_open(s_i2c, IMU_ADDR);
+    s_pmu = axp2101_open(s_i2c);
+}
+
+bool board_battery_read(board_battery_t *out)
+{
+    axp2101_status_t st;
+    if (!axp2101_read(s_pmu, &st)) return false;
+    *out = (board_battery_t){.usb_power = st.usb_power, .battery = st.battery, .charging = st.charging,
+                             .percent = st.percent, .millivolts = st.millivolts};
+    return true;
 }
 
 bool board_imu_read(float g[3])
