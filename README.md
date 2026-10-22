@@ -22,7 +22,7 @@ Turn an ESP32 display into a Roon album-art screen. The firmware is itself a Roo
 |---|---|---|
 | [ESP32-C3-LCDkit](https://docs.espressif.com/projects/espressif-esp-dev-kits/en/latest/esp32c3/esp32-c3-lcdkit/) | 1.28" 240×240 圆屏 round | 旋钮 Knob |
 | [ESP32-S3-BOX-Lite](https://github.com/espressif/esp-box) | 2.4" 320×240 | — |
-| [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm) | 2.16" 480×480 AMOLED | 开发中 In progress |
+| [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm) | 2.16" 480×480 AMOLED | 触摸、体感、电池 Touch, motion, battery |
 
 更多开发板陆续支持，欢迎贡献，见 [docs/adding-a-board.md](docs/adding-a-board.md)。· More boards are coming; contributions welcome.
 
