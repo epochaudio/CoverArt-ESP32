@@ -32,6 +32,7 @@ static volatile bool s_face_down;
 static volatile int64_t s_last_activity_ms;
 static volatile level_t s_level = LEVEL_ON;
 static int s_applied_percent = FULL_BRIGHTNESS;
+static volatile int s_user_percent = FULL_BRIGHTNESS;
 static SemaphoreHandle_t s_lock;  // level changes come from the guard and the Roon task
 
 static int64_t now_ms(void)
@@ -42,7 +43,8 @@ static int64_t now_ms(void)
 static void apply(level_t level)
 {
     static const char *names[] = {"on", "dim", "off"};
-    const int full = power_low() ? LOW_BATTERY_BRIGHTNESS : FULL_BRIGHTNESS;
+    const int cap = power_low() ? LOW_BATTERY_BRIGHTNESS : FULL_BRIGHTNESS;
+    const int full = s_user_percent < cap ? s_user_percent : cap;
     const int dim = SCREEN_DIM_PERCENT < full ? SCREEN_DIM_PERCENT : full;
     const int percent = level == LEVEL_ON ? full : level == LEVEL_DIM ? dim : 0;
     xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -108,6 +110,12 @@ void screen_guard_set_playing(bool playing)
     s_playing = playing;
     s_last_activity_ms = now_ms();  // stopping starts the idle countdown afresh
     if (playing && !s_face_down) apply(LEVEL_ON);
+}
+
+void screen_guard_set_brightness(int percent)
+{
+    s_user_percent = percent;
+    if (s_lock) apply(s_level);
 }
 
 void screen_guard_set_face_down(bool face_down)

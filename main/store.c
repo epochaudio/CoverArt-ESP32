@@ -116,6 +116,24 @@ void store_set_output(const char *output_id, const char *name)
     set_pair("output_id", output_id, "output_name", name);
 }
 
+int store_get_brightness(void)
+{
+    nvs_handle_t h;
+    uint8_t percent = 0;
+    if (!open_ns(NVS_READONLY, &h)) return 0;
+    nvs_get_u8(h, "brightness", &percent);
+    nvs_close(h);
+    return percent;
+}
+
+void store_set_brightness(int percent)
+{
+    nvs_handle_t h;
+    if (!open_ns(NVS_READWRITE, &h)) return;
+    nvs_set_u8(h, "brightness", (uint8_t)percent);
+    commit_close(h);
+}
+
 int store_bump_power_cycles(void)
 {
     nvs_handle_t h;

@@ -6,7 +6,11 @@
 //
 // A board's include/board.h defines:
 //
-//   BOARD_NAME, BOARD_HOSTNAME   shown in Roon and on the network
+//   BOARD_NAME, BOARD_HOSTNAME   board name in logs, host name on the network
+//   BOARD_DISPLAY_NAME           extension name in Roon
+//   BOARD_SCREEN_NAME            the same as it fits one line on the screen
+//   BOARD_BRIGHTNESS_ADJUSTABLE  1 if board_display_set_brightness() takes any
+//                                level (offered in Roon's extension settings)
 //   LCD_WIDTH, LCD_HEIGHT        panel size in pixels
 //   LCD_BOUNCE_ROWS              rows per transfer through the DMA buffer
 //   LCD_DRAW_ALIGN               every drawn area must start and end on this

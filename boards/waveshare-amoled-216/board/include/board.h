@@ -2,6 +2,11 @@
 
 // Waveshare ESP32-S3-Touch-AMOLED-2.16: CO5300 480x480 AMOLED over QSPI.
 #define BOARD_NAME       "AMOLED-2.16"
+// Name in Roon > Settings > Extensions, and as it fits on the screen.
+#define BOARD_DISPLAY_NAME  "CoverArt Mini"
+#define BOARD_SCREEN_NAME   "CoverArt Mini"
+// The panel takes any brightness, so Roon's extension settings offer it.
+#define BOARD_BRIGHTNESS_ADJUSTABLE 1
 #define BOARD_HOSTNAME   "coverart-amoled-216"
 
 #define LCD_WIDTH        480

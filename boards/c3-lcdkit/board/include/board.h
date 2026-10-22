@@ -2,6 +2,11 @@
 
 // ESP32-C3-LCDkit: GC9A01 240x240 round panel over SPI, no PSRAM, rotary knob.
 #define BOARD_NAME       "C3-LCDkit"
+// Name in Roon > Settings > Extensions, and as it fits on the screen.
+#define BOARD_DISPLAY_NAME  "CoverArt_ESP32_C3-LCDkit"
+#define BOARD_SCREEN_NAME   "CoverArt_ESP32"
+// Backlight is on or off only.
+#define BOARD_BRIGHTNESS_ADJUSTABLE 0
 #define BOARD_HOSTNAME   "coverart-c3-lcdkit"
 
 #define LCD_WIDTH        240

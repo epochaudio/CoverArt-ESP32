@@ -102,7 +102,12 @@ static esp_websocket_client_handle_t s_ws;
 static session_t s;
 static char s_output_id[96], s_output_name[96];
 static bool s_cover_shown;
-static char s_extension_id[64], s_display_name[64];
+static char s_extension_id[64];
+// Brightness options offered in the extension settings, percent.
+static const int kBrightnessChoices[] = {20, 40, 60, 80, 100};
+#define BRIGHTNESS_DEFAULT 100
+#define SETTING_BRIGHTNESS "brightness"
+static int s_brightness = BRIGHTNESS_DEFAULT;
 static roon_playback_t s_playback;
 static portMUX_TYPE s_playback_lock = portMUX_INITIALIZER_UNLOCKED;
 // Address of the current session and whether it came from the NVS cache
@@ -145,7 +150,7 @@ static void draw_status(ui_status_t st)
         break;
     }
     case UI_AWAITING_AUTH: {
-        const char *l[] = {"In Roon open", "Settings >", "Extensions,", "enable", ROON_DISPLAY_NAME_BASE};
+        const char *l[] = {"In Roon open", "Settings >", "Extensions,", "enable", BOARD_SCREEN_NAME};
         ui_message(l, 5);
         break;
     }
@@ -385,7 +390,7 @@ static void publish_status(void)
 
 // ---------------------------------------------------------------- settings
 
-static cJSON *settings_layout(const char *output_id, const char *name)
+static cJSON *settings_layout(const char *output_id, const char *name, int brightness)
 {
     cJSON *root = cJSON_CreateObject();
     cJSON *values = cJSON_AddObjectToObject(root, "values");
@@ -402,8 +407,47 @@ static cJSON *settings_layout(const char *output_id, const char *name)
     cJSON_AddStringToObject(picker, "title", "Select playback zone");
     cJSON_AddStringToObject(picker, "setting", SETTING_ZONE);
     cJSON_AddItemToArray(layout, picker);
+#if BOARD_BRIGHTNESS_ADJUSTABLE
+    // Dropdown values are strings in Roon's settings protocol.
+    char value[8];
+    snprintf(value, sizeof(value), "%d", brightness);
+    cJSON_AddStringToObject(values, SETTING_BRIGHTNESS, value);
+    cJSON *dropdown = cJSON_CreateObject();
+    cJSON_AddStringToObject(dropdown, "type", "dropdown");
+    cJSON_AddStringToObject(dropdown, "title", "屏幕亮度 Brightness");
+    cJSON_AddStringToObject(dropdown, "setting", SETTING_BRIGHTNESS);
+    cJSON *choices = cJSON_AddArrayToObject(dropdown, "values");
+    for (size_t i = 0; i < sizeof(kBrightnessChoices) / sizeof(kBrightnessChoices[0]); i++) {
+        char v[8], title[8];
+        snprintf(v, sizeof(v), "%d", kBrightnessChoices[i]);
+        snprintf(title, sizeof(title), "%d%%", kBrightnessChoices[i]);
+        cJSON *choice = cJSON_CreateObject();
+        cJSON_AddStringToObject(choice, "title", title);
+        cJSON_AddStringToObject(choice, "value", v);
+        cJSON_AddItemToArray(choices, choice);
+    }
+    cJSON_AddItemToArray(layout, dropdown);
+#else
+    (void)brightness;
+#endif
     cJSON_AddBoolToObject(root, "has_error", false);
     return root;
+}
+
+static cJSON *current_settings(void)
+{
+    return settings_layout(s_output_id, s_output_name, s_brightness);
+}
+
+// A brightness from the settings form, or -1 if absent or not one we offer.
+static int parse_brightness(const cJSON *values)
+{
+    const char *text = str_of(values, SETTING_BRIGHTNESS);
+    if (!text) return -1;
+    const int percent = atoi(text);
+    for (size_t i = 0; i < sizeof(kBrightnessChoices) / sizeof(kBrightnessChoices[0]); i++)
+        if (kBrightnessChoices[i] == percent) return percent;
+    return -1;
 }
 
 static cJSON *wrap_settings(cJSON *layout)
@@ -416,28 +460,42 @@ static cJSON *wrap_settings(cJSON *layout)
 static void on_save_settings(const moo_msg_t *m)
 {
     cJSON *body = parse_body(m);
-    const cJSON *zone = cJSON_GetObjectItemCaseSensitive(
-        cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(body, "settings"), "values"),
-        SETTING_ZONE);
+    const cJSON *values =
+        cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(body, "settings"), "values");
+    const cJSON *zone = cJSON_GetObjectItemCaseSensitive(values, SETTING_ZONE);
     const char *id = str_of(zone, "output_id");
     const char *name = str_of(zone, "name") ?: str_of(zone, "display_name") ?: "";
-    bool dry_run = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(body, "is_dry_run"));
+    const int asked_brightness = parse_brightness(values);
+    const int brightness = asked_brightness > 0 ? asked_brightness : s_brightness;
+    const bool dry_run = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(body, "is_dry_run"));
 
-    if (!id) {
-        // No zone picked: echo the stored choice so the dialog stays consistent.
-        send_reply("COMPLETE", "Success", m->request_id, wrap_settings(settings_layout(s_output_id, s_output_name)));
-    } else if (dry_run) {
-        send_reply("COMPLETE", "Success", m->request_id, wrap_settings(settings_layout(id, name)));
-    } else {
+    if (dry_run) {
+        // Echo the form as edited; nothing is applied until it is saved.
+        send_reply("COMPLETE", "Success", m->request_id,
+                   wrap_settings(id ? settings_layout(id, name, brightness)
+                                    : settings_layout(s_output_id, s_output_name, brightness)));
+        cJSON_Delete(body);
+        return;
+    }
+
+    const bool zone_changed = id && strcmp(id, s_output_id) != 0;
+    if (id) {
         strlcpy(s_output_id, id, sizeof(s_output_id));
         strlcpy(s_output_name, name, sizeof(s_output_name));
         store_set_output(s_output_id, s_output_name);
         ESP_LOGI(TAG, "zone set to '%s' (output %s)", s_output_name, s_output_id);
-        send_reply("COMPLETE", "Success", m->request_id, wrap_settings(settings_layout(s_output_id, s_output_name)));
-        if (s.settings_subscription[0])
-            send_reply("CONTINUE", "Changed", s.settings_subscription,
-                       wrap_settings(settings_layout(s_output_id, s_output_name)));
-        publish_status();
+    }
+    if (brightness != s_brightness) {
+        s_brightness = brightness;
+        store_set_brightness(brightness);
+        screen_guard_set_brightness(brightness);
+        ESP_LOGI(TAG, "brightness set to %d%%", brightness);
+    }
+    send_reply("COMPLETE", "Success", m->request_id, wrap_settings(current_settings()));
+    if (s.settings_subscription[0])
+        send_reply("CONTINUE", "Changed", s.settings_subscription, wrap_settings(current_settings()));
+    publish_status();
+    if (zone_changed) {
         s.image_key[0] = '\0';  // force a fetch for the newly chosen zone
         subscribe_zones();
     }
@@ -561,12 +619,12 @@ static void on_core_request(const moo_msg_t *m)
         send_reply("COMPLETE", "Success", m->request_id, status_body());
     } else if (strcmp(name, SVC_SETTINGS "/subscribe_settings") == 0) {
         strlcpy(s.settings_subscription, m->request_id, sizeof(s.settings_subscription));
-        send_reply("CONTINUE", "Subscribed", m->request_id, wrap_settings(settings_layout(s_output_id, s_output_name)));
+        send_reply("CONTINUE", "Subscribed", m->request_id, wrap_settings(current_settings()));
     } else if (strcmp(name, SVC_SETTINGS "/unsubscribe_settings") == 0) {
         s.settings_subscription[0] = '\0';
         send_reply("COMPLETE", "Unsubscribed", m->request_id, NULL);
     } else if (strcmp(name, SVC_SETTINGS "/get_settings") == 0) {
-        send_reply("COMPLETE", "Success", m->request_id, wrap_settings(settings_layout(s_output_id, s_output_name)));
+        send_reply("COMPLETE", "Success", m->request_id, wrap_settings(current_settings()));
     } else if (strcmp(name, SVC_SETTINGS "/save_settings") == 0) {
         on_save_settings(m);
     } else {
@@ -581,10 +639,11 @@ static void send_register(void)
 {
     cJSON *b = cJSON_CreateObject();
     cJSON_AddStringToObject(b, "extension_id", s_extension_id);
-    cJSON_AddStringToObject(b, "display_name", s_display_name);
+    cJSON_AddStringToObject(b, "display_name", BOARD_DISPLAY_NAME);
     cJSON_AddStringToObject(b, "display_version", esp_app_get_description()->version);
     cJSON_AddStringToObject(b, "publisher", ROON_PUBLISHER);
     cJSON_AddStringToObject(b, "email", ROON_EMAIL);
+    cJSON_AddStringToObject(b, "website", ROON_WEBSITE);
     char token[128];
     const bool paired = store_get_token(s.core_id, token, sizeof(token));
     if (paired) cJSON_AddStringToObject(b, "token", token);
@@ -915,14 +974,18 @@ static void init_identity(void)
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     snprintf(s_extension_id, sizeof(s_extension_id), "%s.%02x%02x%02x", ROON_EXTENSION_ID_BASE, mac[3], mac[4], mac[5]);
-    snprintf(s_display_name, sizeof(s_display_name), "%s_%s", ROON_DISPLAY_NAME_BASE, BOARD_NAME);
-    ESP_LOGI(TAG, "extension %s as '%s'", s_extension_id, s_display_name);
+    ESP_LOGI(TAG, "extension %s as '%s'", s_extension_id, BOARD_DISPLAY_NAME);
 }
 
 void roon_start(void)
 {
     init_identity();
     s_events = xQueueCreate(EVENT_QUEUE_DEPTH, sizeof(event_t));
+    const int stored_brightness = store_get_brightness();
+    if (BOARD_BRIGHTNESS_ADJUSTABLE && stored_brightness > 0) {
+        s_brightness = stored_brightness;
+        screen_guard_set_brightness(stored_brightness);
+    }
     if (!store_get_output(s_output_id, sizeof(s_output_id), s_output_name, sizeof(s_output_name)))
         s_output_id[0] = '\0';
     else

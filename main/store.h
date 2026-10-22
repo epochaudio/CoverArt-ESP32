@@ -25,6 +25,10 @@ void store_clear_core_address(void);
 bool store_get_output(char *output_id, size_t id_len, char *name, size_t name_len);
 void store_set_output(const char *output_id, const char *name);
 
+// Screen brightness chosen in Roon's extension settings, percent; 0 if none.
+int store_get_brightness(void);
+void store_set_brightness(int percent);
+
 // Quick power-on counter for the factory-reset gesture (see factory_reset.h).
 int store_bump_power_cycles(void);
 void store_clear_power_cycles(void);

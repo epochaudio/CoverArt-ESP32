@@ -3,11 +3,12 @@
 #include "board.h"
 
 // Identity shown in Roon > Settings > Extensions. Each device registers its own
-// extension id (base + MAC suffix) so several displays can be paired at once.
-// The version shown is the firmware version from version.txt.
+// extension id (base + MAC suffix) so several displays can be paired at once;
+// the name is the board's BOARD_DISPLAY_NAME and the version comes from
+// version.txt.
 #define ROON_EXTENSION_ID_BASE  "com.epochaudio.coverart-esp32"
-#define ROON_DISPLAY_NAME_BASE  "CoverArt_ESP32"
 #define ROON_PUBLISHER          "门耳朵制作"
+#define ROON_WEBSITE            "https://www.epochaudio.cn/"
 #define ROON_EMAIL              "masked"
 
 // SOOD discovery, as used by Roon Core and node-roon-api.

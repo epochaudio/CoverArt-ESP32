@@ -1,7 +1,14 @@
 # Changelog
 
-## 0.5.1
+## 0.6.0
 
+- The AMOLED-2.16 is named **CoverArt Mini** in Roon. Each board now sets its
+  Roon name and the shorter name used on screen; registration carries the
+  website https://www.epochaudio.cn/.
+- Screen brightness (20–100 %, default 100 %) in the extension's settings
+  next to the zone, on boards whose panel can dim (AMOLED-2.16). Dimming and
+  the low-battery cap never exceed it.
+- Saving the extension settings re-reads the zone only when it changed.
 - Fixed: the status line in Roon > Settings > Extensions (connection, zone
   and battery level) never appeared. The status service is
   `com.roonlabs.status:1`, not `:2`; Core ignored the unknown name.

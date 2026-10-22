@@ -2,7 +2,7 @@
 
 中文 · [English](manual.en.md)
 
-适用固件：0.5.1
+适用固件：0.6.0
 
 > 0.5.x 中 C3-LCDkit 和 BOX-Lite 的代码随板级接口重构做了调整，尚未在实机上验证；需要稳定使用这两款设备的用户可暂留在 0.4.1。
 
@@ -58,8 +58,8 @@ CoverArt ESP32 把一块 ESP32 小屏变成 Roon 的专辑封面显示器。设�
 ### 4.2 在 Roon 中启用
 
 1. 打开 Roon → **设置 → 扩展**。
-2. 找到 **CoverArt_ESP32_<型号>**（发布者“门耳朵制作”），点击“启用”。
-3. 点击该扩展的“设置”，在 **Select playback zone** 中选择要跟随的 Zone，保存。
+2. 找到本设备的扩展（发布者“门耳朵制作”），点击“启用”。AMOLED-2.16 显示为 **CoverArt Mini**，其他型号显示为 **CoverArt_ESP32_<型号>**。
+3. 点击该扩展的“设置”，在 **Select playback zone** 中选择要跟随的 Zone，保存。AMOLED-2.16 在这里还有 **屏幕亮度 Brightness**（20%–100%，默认 100%），保存后立即生效。
 
 完成后屏幕会立即显示该 Zone 当前播放的封面。每台设备在 Roon 里都是独立的扩展，可以同时使用多台设备，各自跟随不同的 Zone。
 
@@ -77,7 +77,7 @@ CoverArt ESP32 把一块 ESP32 小屏变成 Roon 的专辑封面显示器。设�
 | CONNECTING WI-FI | 正在连接已保存的 Wi-Fi | 等待；超过 3 分钟连不上会自动回到配网模式 |
 | FINDING ROON CORE | 正在局域网中查找 Roon Core | 等待 |
 | ROON CORE NOT FOUND / Retrying | 没有找到 Roon Core，会持续重试 | 确认 Roon Core 已开启、与设备在同一网络 |
-| In Roon open Settings > Extensions, enable CoverArt_ESP32 | 等待在 Roon 中启用 | 按 4.2 启用扩展 |
+| In Roon open Settings > Extensions, enable CoverArt Mini（其他型号为 CoverArt_ESP32） | 等待在 Roon 中启用 | 按 4.2 启用扩展 |
 | In Roon extension settings, choose a zone | 已启用，尚未选择 Zone | 在扩展设置中选择 Zone |
 | NOTHING PLAYING | 所选 Zone 当前没有播放 | 在 Roon 中开始播放 |
 
@@ -139,8 +139,8 @@ AMOLED 屏长时间显示同一画面会留下残影，设备会自动保护：
 
 | 状态 | 屏幕 |
 |---|---|
-| 正在播放 | 正常亮度 |
-| 停止或暂停 5 分钟 | 变暗（20% 亮度） |
+| 正在播放 | 正常亮度：扩展设置中选择的亮度（默认 100%） |
+| 停止或暂停 5 分钟 | 变暗（20% 亮度，不超过所选亮度） |
 | 停止或暂停 15 分钟 | 熄灭 |
 | 屏幕朝下 | 立即熄灭 |
 | 与 Roon Core 断开 | 视为停止，按上面的时间变暗、熄灭 |

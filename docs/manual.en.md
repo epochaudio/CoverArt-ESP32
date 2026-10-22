@@ -2,7 +2,7 @@
 
 [中文](manual.md) · English
 
-Firmware: 0.5.1
+Firmware: 0.6.0
 
 > In 0.5.x the C3-LCDkit and BOX-Lite code was reworked along with the board layer and has not yet been verified on hardware. Users who need these boards to be dependable can stay on 0.4.1.
 
@@ -58,8 +58,8 @@ Only 2.4 GHz networks are listed. Network names and passwords with non-ASCII cha
 ### 4.2 Enabling the extension in Roon
 
 1. In Roon, open **Settings → Extensions**.
-2. Find **CoverArt_ESP32_<board>** (publisher “门耳朵制作”) and click **Enable**.
-3. Open the extension's **Settings**, choose the zone to follow under **Select playback zone**, and save.
+2. Find this device’s extension (publisher “门耳朵制作”) and click **Enable**. The AMOLED-2.16 is listed as **CoverArt Mini**, other boards as **CoverArt_ESP32_<board>**.
+3. Open the extension's **Settings**, choose the zone to follow under **Select playback zone**, and save. On the AMOLED-2.16 this is also where **屏幕亮度 Brightness** is set (20 %–100 %, default 100 %); it applies as soon as you save.
 
 The screen shows the zone's current cover right away. Every device is its own extension in Roon, so several devices can run at once, each following a different zone.
 
@@ -77,7 +77,7 @@ In the extension list, a status line under the device reads, for example:
 | CONNECTING WI-FI | Joining the saved Wi-Fi | Wait; after 3 minutes without success the device goes back to setup mode |
 | FINDING ROON CORE | Looking for the Roon Core on the network | Wait |
 | ROON CORE NOT FOUND / Retrying | No Roon Core found yet; keeps trying | Check that the Roon Core is running and on the same network |
-| In Roon open Settings > Extensions, enable CoverArt_ESP32 | Waiting to be enabled in Roon | Enable the extension as in 4.2 |
+| In Roon open Settings > Extensions, enable CoverArt Mini (CoverArt_ESP32 on other boards) | Waiting to be enabled in Roon | Enable the extension as in 4.2 |
 | In Roon extension settings, choose a zone | Enabled, no zone chosen | Choose a zone in the extension's settings |
 | NOTHING PLAYING | Nothing plays in the chosen zone | Start playback in Roon |
 
@@ -139,8 +139,8 @@ An AMOLED screen that shows the same image for a long time can keep a ghost of i
 
 | Situation | Screen |
 |---|---|
-| Playing | Normal brightness |
-| Stopped or paused for 5 minutes | Dimmed (20 %) |
+| Playing | Normal brightness: the level chosen in the extension settings (default 100 %) |
+| Stopped or paused for 5 minutes | Dimmed (20 %, never above the chosen level) |
 | Stopped or paused for 15 minutes | Off |
 | Lying screen-down | Off at once |
 | Roon Core unreachable | Treated as stopped: dims and turns off on the same schedule |

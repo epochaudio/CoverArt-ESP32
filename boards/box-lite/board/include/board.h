@@ -2,6 +2,11 @@
 
 // ESP32-S3-BOX-Lite: ST7789 320x240 over SPI, 8 MB PSRAM.
 #define BOARD_NAME       "BOX-Lite"
+// Name in Roon > Settings > Extensions, and as it fits on the screen.
+#define BOARD_DISPLAY_NAME  "CoverArt_ESP32_BOX-Lite"
+#define BOARD_SCREEN_NAME   "CoverArt_ESP32"
+// Backlight is on or off only.
+#define BOARD_BRIGHTNESS_ADJUSTABLE 0
 #define BOARD_HOSTNAME   "coverart-box-lite"
 
 #define LCD_WIDTH        320

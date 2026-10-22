@@ -13,6 +13,10 @@ void screen_guard_start(void);
 // Selected zone is playing (false also while Roon Core is unreachable).
 void screen_guard_set_playing(bool playing);
 
+// Full brightness chosen by the user, percent (dim and low-battery levels
+// never exceed it). Re-applied at once.
+void screen_guard_set_brightness(int percent);
+
 // Device lying screen-down: dark until turned back up (which counts as activity).
 void screen_guard_set_face_down(bool face_down);
 
