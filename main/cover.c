@@ -50,12 +50,29 @@ static UINT write_block(JDEC *jd, void *bitmap, JRECT *r)
     return 1;
 }
 
+// Last cover, kept on boards that redraw it in place (pixel shift).
+static uint8_t *s_last_jpeg;
+static size_t s_last_len;
+static bool s_on_screen;
+static int s_dx, s_dy;
+
 void cover_clear(void)
 {
     display_fill(0);
+    s_on_screen = false;
 }
 
-bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
+// Blacks out the panel around the image so nothing of a previous, larger or
+// differently placed cover remains, without blanking the image area itself.
+static void fill_margins(int x0, int y0, int w, int h)
+{
+    display_fill_rect(0, 0, LCD_WIDTH, y0, 0);
+    display_fill_rect(0, y0 + h, LCD_WIDTH, LCD_HEIGHT - y0 - h, 0);
+    display_fill_rect(0, y0, x0, h, 0);
+    display_fill_rect(x0 + w, y0, LCD_WIDTH - x0 - w, h, 0);
+}
+
+static bool draw(const uint8_t *jpeg, size_t len)
 {
     int64_t t0 = esp_timer_get_time();
     decode_ctx_t ctx = {.jpeg = jpeg, .len = len};
@@ -75,12 +92,17 @@ bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
     }
     ctx.strip = heap_caps_malloc((size_t)jd.width * MCU_MAX_ROWS * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
     if (!ctx.strip) goto out;
-    ctx.x0 = (LCD_WIDTH - jd.width) / 2;
-    ctx.y0 = (LCD_HEIGHT - jd.height) / 2;
-    // A cover smaller than the panel leaves borders from the previous one.
-    if (jd.width < LCD_WIDTH || jd.height < LCD_HEIGHT) display_fill(0);
+    ctx.x0 = (LCD_WIDTH - jd.width) / 2 + s_dx;
+    ctx.y0 = (LCD_HEIGHT - jd.height) / 2 + s_dy;
+    if (ctx.x0 < 0 || ctx.y0 < 0 || ctx.x0 + jd.width > LCD_WIDTH || ctx.y0 + jd.height > LCD_HEIGHT) {
+        ctx.x0 = (LCD_WIDTH - jd.width) / 2;  // no room to shift this cover
+        ctx.y0 = (LCD_HEIGHT - jd.height) / 2;
+    }
 
+    display_lock();
+    fill_margins(ctx.x0, ctx.y0, jd.width, jd.height);
     res = jd_decomp(&jd, write_block, 0);
+    display_unlock();
     ok = res == JDR_OK;
     if (ok) {
         ESP_LOGI(TAG, "shown %ux%u from %u B jpeg in %lld ms", jd.width, jd.height, (unsigned)len,
@@ -92,4 +114,33 @@ bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
 out:
     free(pool);
     return ok;
+}
+
+bool cover_show_jpeg(const uint8_t *jpeg, size_t len)
+{
+    display_lock();
+    bool ok = draw(jpeg, len);
+    s_on_screen = ok;
+#if SCREEN_PIXEL_SHIFT
+    if (ok) {
+        uint8_t *copy = malloc(len);
+        if (copy) {
+            memcpy(copy, jpeg, len);
+            free(s_last_jpeg);
+            s_last_jpeg = copy;
+            s_last_len = len;
+        }
+    }
+#endif
+    display_unlock();
+    return ok;
+}
+
+void cover_set_offset(int dx, int dy)
+{
+    display_lock();
+    s_dx = dx;
+    s_dy = dy;
+    if (s_on_screen && s_last_jpeg) draw(s_last_jpeg, s_last_len);
+    display_unlock();
 }

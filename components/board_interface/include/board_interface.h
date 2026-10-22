@@ -15,6 +15,9 @@
 //   COVER_SIZE                   square cover size requested from Roon
 //   MOO_MAX_MESSAGE_BYTES        largest Roon message accepted
 //   BOARD_HAS_KNOB               1 with KNOB_PIN_A, KNOB_PIN_B, KNOB_PIN_PRESS
+//   SCREEN_DIM_AFTER_MS, SCREEN_OFF_AFTER_MS, SCREEN_DIM_PERCENT,
+//   SCREEN_PIXEL_SHIFT           idle dimming and burn-in protection, see
+//                                main/screen_guard.h (0 = off)
 
 #include <stdint.h>
 #include "esp_lcd_panel_io.h"

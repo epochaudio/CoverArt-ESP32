@@ -9,6 +9,7 @@
 #include "knob.h"
 #include "provision.h"
 #include "roon.h"
+#include "screen_guard.h"
 #include "store.h"
 #include "ui.h"
 #include "wifi.h"
@@ -42,6 +43,7 @@ void app_main(void)
         provision_run();
     }
 
+    screen_guard_start();
     roon_start();
     knob_start();
     for (;;) {

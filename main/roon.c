@@ -17,6 +17,7 @@
 #include "json_scan.h"
 #include "moo.h"
 #include "sood.h"
+#include "screen_guard.h"
 #include "store.h"
 #include "ui.h"
 #include "wifi.h"
@@ -248,6 +249,8 @@ static void apply_zone(const char *text, size_t len, void *ctx)
     if (!zone_has_selected_output(zone)) goto done;
     s.zone_seen = true;
     update_volume_support(zone);
+    const char *state = str_of(zone, "state");
+    screen_guard_set_playing(state && strcmp(state, "playing") == 0);
     const cJSON *np = cJSON_GetObjectItemCaseSensitive(zone, "now_playing");
     if (!np) {  // stopped: keep the last cover, or say so if none was shown yet
         show_status(UI_NOTHING_PLAYING);
@@ -263,6 +266,7 @@ static void apply_zone(const char *text, size_t len, void *ctx)
     }
     if (strcmp(key, s.image_key) == 0) goto done;
     strlcpy(s.image_key, key, sizeof(s.image_key));
+    screen_guard_wake();  // a new track is worth seeing, even while paused
     const cJSON *line = cJSON_GetObjectItemCaseSensitive(np, "one_line");
     ESP_LOGI(TAG, "now playing in '%s': %s", str_of(zone, "display_name") ?: "?",
              line ? (str_of(line, "line1") ?: "") : "");
@@ -284,7 +288,10 @@ static void on_zones(const moo_msg_t *m)
     json_scan_array_objects(body, m->body_len, "zones_added", apply_zone, NULL);    // Changed
     json_scan_array_objects(body, m->body_len, "zones_changed", apply_zone, NULL);  // Changed
     // The selected output is in no zone (e.g. the device is switched off).
-    if (snapshot && !s.zone_seen && s_output_id[0]) show_status(UI_NOTHING_PLAYING);
+    if (snapshot && !s.zone_seen && s_output_id[0]) {
+        screen_guard_set_playing(false);
+        show_status(UI_NOTHING_PLAYING);
+    }
 }
 
 // Starts a fresh zone subscription; Core answers with a full snapshot, which
@@ -732,6 +739,7 @@ static bool run_session(const char *host, uint16_t port)
             last_report = now;
         }
     }
+    screen_guard_set_playing(false);  // unknown while Core is unreachable: let the screen rest
     esp_websocket_client_stop(s_ws);
     esp_websocket_client_destroy(s_ws);
     s_ws = NULL;

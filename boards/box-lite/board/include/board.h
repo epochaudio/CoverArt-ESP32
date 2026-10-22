@@ -16,3 +16,9 @@
 
 // The front keys are not used yet.
 #define BOARD_HAS_KNOB   0
+
+// Screen guard (main/screen_guard.h): an LCD stays lit.
+#define SCREEN_DIM_AFTER_MS   0
+#define SCREEN_OFF_AFTER_MS   0
+#define SCREEN_DIM_PERCENT    100
+#define SCREEN_PIXEL_SHIFT    0

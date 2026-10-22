@@ -5,8 +5,12 @@
 // with byte swapping enabled.
 void display_init(void);
 void display_fill(uint16_t color_be);
+void display_fill_rect(int x, int y, int w, int h, uint16_t color_be);
 // 0 = dark; panels with an on/off backlight treat any other value as on.
 void display_set_brightness(uint8_t percent);
+// Holds the panel across several calls (recursive), e.g. a whole image.
+void display_lock(void);
+void display_unlock(void);
 // Draws a w*h block at (x, y). Pixels may live in PSRAM; they are streamed
 // through an internal DMA buffer.
 void display_draw(int x, int y, int w, int h, const uint16_t *pixels_be);

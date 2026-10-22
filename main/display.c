@@ -12,6 +12,9 @@ static const char *TAG = "display";
 static esp_lcd_panel_handle_t s_panel;
 static uint16_t *s_bounce;
 static SemaphoreHandle_t s_done;
+// Drawing calls may come from the Roon task and the screen guard; each call
+// holds the panel for its whole area.
+static SemaphoreHandle_t s_lock;
 
 #define BOUNCE_PIXELS (LCD_WIDTH * LCD_BOUNCE_ROWS)
 
@@ -25,6 +28,7 @@ static bool on_flushed(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data
 void display_init(void)
 {
     s_done = xSemaphoreCreateBinary();
+    s_lock = xSemaphoreCreateRecursiveMutex();
     s_bounce = heap_caps_malloc(BOUNCE_PIXELS * sizeof(uint16_t), MALLOC_CAP_DMA);
     assert(s_bounce);
     s_panel = board_display_init(on_flushed, NULL);
@@ -33,9 +37,14 @@ void display_init(void)
     ESP_LOGI(TAG, "%s panel %dx%d ready", BOARD_NAME, LCD_WIDTH, LCD_HEIGHT);
 }
 
+void display_lock(void) { xSemaphoreTakeRecursive(s_lock, portMAX_DELAY); }
+void display_unlock(void) { xSemaphoreGiveRecursive(s_lock); }
+
 void display_set_brightness(uint8_t percent)
 {
+    display_lock();
     board_display_set_brightness(percent);
+    display_unlock();
 }
 
 static void push(int x, int y, int w, int h)
@@ -44,18 +53,27 @@ static void push(int x, int y, int w, int h)
     xSemaphoreTake(s_done, portMAX_DELAY);
 }
 
-void display_fill(uint16_t color_be)
-{
-    for (int i = 0; i < BOUNCE_PIXELS; i++) s_bounce[i] = color_be;
-    for (int y = 0; y < LCD_HEIGHT; y += LCD_BOUNCE_ROWS) {
-        int rows = LCD_HEIGHT - y < LCD_BOUNCE_ROWS ? LCD_HEIGHT - y : LCD_BOUNCE_ROWS;
-        push(0, y, LCD_WIDTH, rows);
-    }
-}
-
 static int align_down(int v) { return v - v % LCD_DRAW_ALIGN; }
 static int align_up(int v) { return align_down(v + LCD_DRAW_ALIGN - 1); }
 static int clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+void display_fill_rect(int x, int y, int w, int h, uint16_t color_be)
+{
+    if (w <= 0 || h <= 0) return;
+    const int x0 = align_down(x), y0 = align_down(y);
+    const int x1 = clamp(align_up(x + w), 0, LCD_WIDTH), y1 = clamp(align_up(y + h), 0, LCD_HEIGHT);
+    const int out_w = x1 - x0;
+    const int max_rows = align_down(BOUNCE_PIXELS / out_w);
+    display_lock();
+    for (int i = 0; i < out_w * max_rows; i++) s_bounce[i] = color_be;
+    for (int top = y0; top < y1; top += max_rows) push(x0, top, out_w, y1 - top < max_rows ? y1 - top : max_rows);
+    display_unlock();
+}
+
+void display_fill(uint16_t color_be)
+{
+    display_fill_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, color_be);
+}
 
 // Panels with a drawing grid (LCD_DRAW_ALIGN > 1) get the area widened to the
 // grid; the added border repeats the nearest edge pixel of the source, so the
@@ -69,6 +87,7 @@ void display_draw(int x, int y, int w, int h, const uint16_t *pixels_be)
     const int max_rows = align_down(BOUNCE_PIXELS / out_w);
     const bool padded = x0 != x || out_w != w || y0 != y || y1 != y + h;
 
+    display_lock();
     for (int top = y0; top < y1; top += max_rows) {
         const int rows = y1 - top < max_rows ? y1 - top : max_rows;
         for (int r = 0; r < rows; r++) {
@@ -83,4 +102,5 @@ void display_draw(int x, int y, int w, int h, const uint16_t *pixels_be)
         }
         push(x0, top, out_w, rows);
     }
+    display_unlock();
 }

@@ -21,3 +21,9 @@
 #define KNOB_PIN_A       10
 #define KNOB_PIN_B       6
 #define KNOB_PIN_PRESS   9
+
+// Screen guard (main/screen_guard.h): an LCD stays lit.
+#define SCREEN_DIM_AFTER_MS   0
+#define SCREEN_OFF_AFTER_MS   0
+#define SCREEN_DIM_PERCENT    100
+#define SCREEN_PIXEL_SHIFT    0
