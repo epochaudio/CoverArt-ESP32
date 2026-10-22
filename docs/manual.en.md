@@ -2,9 +2,9 @@
 
 [中文](manual.md) · English
 
-Firmware: 0.5.0
+Firmware: 0.5.1
 
-> In 0.5.0 the C3-LCDkit and BOX-Lite code was reworked along with the board layer and has not yet been verified on hardware. Users who need these boards to be dependable can stay on 0.4.1.
+> In 0.5.x the C3-LCDkit and BOX-Lite code was reworked along with the board layer and has not yet been verified on hardware. Users who need these boards to be dependable can stay on 0.4.1.
 
 CoverArt ESP32 turns a small ESP32 display into an album-art screen for Roon. The device is itself a Roon extension: power it up, connect it to Wi-Fi, enable it once in Roon, and from then on it shows the cover of whatever plays in the zone you chose. No computer, phone app or Home Assistant needs to keep running.
 

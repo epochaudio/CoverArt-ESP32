@@ -30,7 +30,10 @@ static const char *TAG = "roon";
 #define SVC_IMAGE      "com.roonlabs.image:1"
 #define SVC_SETTINGS   "com.roonlabs.settings:1"
 #define SVC_PING       "com.roonlabs.ping:1"
-#define SVC_STATUS     "com.roonlabs.status:2"
+#define SVC_STATUS     "com.roonlabs.status:1"
+// Provided by node-roon-api to every extension that uses Core's services;
+// Core pairs the extension through it.
+#define SVC_PAIRING    "com.roonlabs.pairing:1"
 #define SETTING_ZONE   "zone"
 
 #define WS_OP_CONTINUATION 0x0
@@ -82,6 +85,7 @@ typedef struct {
     char core_id[64];
     char settings_subscription[24];  // Core's subscribe_settings Request-Id
     char status_subscription[24];    // Core's subscribe_status Request-Id
+    char pairing_subscription[24];   // Core's subscribe_pairing Request-Id
     char image_key[128];             // cover currently shown or requested
     uint32_t zones_subscription;     // key of the live subscribe_zones
     bool volume_supported;           // selected output has a volume control
@@ -523,11 +527,30 @@ static void on_control_event(const event_t *ev)
 
 // ---------------------------------------------------------------- dispatch
 
+static cJSON *pairing_body(void)
+{
+    cJSON *b = cJSON_CreateObject();
+    cJSON_AddStringToObject(b, "paired_core_id", s.core_id);
+    return b;
+}
+
 static void on_core_request(const moo_msg_t *m)
 {
     const char *name = m->name;
     if (strcmp(name, SVC_PING "/ping") == 0) {
         send_reply("COMPLETE", "Success", m->request_id, NULL);
+    } else if (strcmp(name, SVC_PAIRING "/subscribe_pairing") == 0) {
+        strlcpy(s.pairing_subscription, m->request_id, sizeof(s.pairing_subscription));
+        send_reply("CONTINUE", "Subscribed", m->request_id, pairing_body());
+    } else if (strcmp(name, SVC_PAIRING "/unsubscribe_pairing") == 0) {
+        s.pairing_subscription[0] = '\0';
+        send_reply("COMPLETE", "Unsubscribed", m->request_id, NULL);
+    } else if (strcmp(name, SVC_PAIRING "/get_pairing") == 0) {
+        send_reply("COMPLETE", "Success", m->request_id, pairing_body());
+    } else if (strcmp(name, SVC_PAIRING "/pair") == 0) {
+        // One Core per device, already this one. Like node-roon-api, pair gets
+        // no reply; subscribers hear the (unchanged) paired core.
+        if (s.pairing_subscription[0]) send_reply("CONTINUE", "Changed", s.pairing_subscription, pairing_body());
     } else if (strcmp(name, SVC_STATUS "/subscribe_status") == 0) {
         strlcpy(s.status_subscription, m->request_id, sizeof(s.status_subscription));
         send_reply("CONTINUE", "Subscribed", m->request_id, status_body());
@@ -566,7 +589,7 @@ static void send_register(void)
     const bool paired = store_get_token(s.core_id, token, sizeof(token));
     if (paired) cJSON_AddStringToObject(b, "token", token);
     const char *required[] = {SVC_TRANSPORT, SVC_IMAGE};
-    const char *provided[] = {SVC_PING, SVC_SETTINGS, SVC_STATUS};
+    const char *provided[] = {SVC_STATUS, SVC_SETTINGS, SVC_PAIRING, SVC_PING};
     cJSON_AddItemToObject(b, "required_services", cJSON_CreateStringArray(required, 2));
     cJSON_AddItemToObject(b, "optional_services", cJSON_CreateArray());
     cJSON_AddItemToObject(b, "provided_services", cJSON_CreateStringArray(provided, sizeof(provided) / sizeof(provided[0])));

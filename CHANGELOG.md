@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Fixed: the status line in Roon > Settings > Extensions (connection, zone
+  and battery level) never appeared. The status service is
+  `com.roonlabs.status:1`, not `:2`; Core ignored the unknown name.
+- The extension also provides `com.roonlabs.pairing:1`, as node-roon-api
+  does for every extension; Core subscribes to it on registration.
+
 ## 0.5.0
 
 New board: Waveshare ESP32-S3-Touch-AMOLED-2.16 (480×480 AMOLED, touch,
